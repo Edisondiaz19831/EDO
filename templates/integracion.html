@@ -1,0 +1,485 @@
+    {% extends "base.html" %}
+{% block title %}Integración — h(t) y tiempo de vaciado{% endblock %}
+{% block head %}
+  <!-- Chart.js para el gráfico -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+  .tank-card { position: relative; }
+  .tank-wrap { display:flex; gap:16px; align-items:flex-start; }
+  /* Un riel delgado amarillo a la derecha como en tu imagen */
+  .tank-rail { width:10px; background:#ffd400; border-radius:3px; margin-top:10px; height:340px; }
+  .tank-legend small { line-height:1.1; display:block; }
+  /* Tipografía compacta para fórmulas numéricas */
+  .mathmono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
+  /* Pequeñas etiquetas */
+  .badge-soft {
+    background:#eef2ff; color:#1e2a78; border:1px solid #c7d2fe;
+    border-radius:8px; padding:2px 8px; font-size:.8rem;
+  }
+</style>
+
+{% endblock %}
+{% block content %}
+
+<div class="row g-4">
+  <div class="col-lg-7">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h4 class="card-title mb-3">Integración de \(\dfrac{dh}{dt}=-(a/A)\sqrt{2gh}\)</h4>
+
+        <!-- Paso 1: separar variables -->
+        <h6 class="mb-2">Paso 1. Separación de variables</h6>
+        <p>
+          Pasamos todo lo que depende de \(h\) a la izquierda y \(t\) a la derecha:
+        </p>
+        <p class="fs-5 text-center mb-2">
+          \(
+          \dfrac{dh}{\sqrt{h}} \;=\; -\,\dfrac{a}{A}\,\sqrt{2g}\;dt.
+          \)
+        </p>
+
+        <!-- Paso 2: integrar con condiciones -->
+        <h6 class="mb-2">Paso 2. Integramos con \(h(0)=h_0\)</h6>
+        <p>
+          Integramos desde \(t=0\) hasta \(t\) y desde \(h_0\) hasta \(h(t)\):
+        </p>
+        <p class="fs-5 text-center">
+          \(
+          \int_{h_0}^{h(t)} \! \frac{dh}{\sqrt{h}}
+          \;=\;
+          -\,\frac{a}{A}\,\sqrt{2g}\;\int_{0}^{t}\! dt.
+          \)
+        </p>
+        <p class="fs-5 text-center mb-2">
+          \(
+          2\big(\sqrt{h(t)}-\sqrt{h_0}\big) \;=\; -\,\frac{a}{A}\,\sqrt{2g}\;t.
+          \)
+        </p>
+
+        <!-- Paso 3: despejar h(t) -->
+        <h6 class="mb-2">Paso 3. Despejamos \(h(t)\)</h6>
+        <p class="fs-5 text-center mb-2">
+          \(
+          \sqrt{h(t)} \;=\; \sqrt{h_0} \;-\; \frac{a}{2A}\,\sqrt{2g}\;t
+          \)
+        </p>
+        <p class="fs-5 text-center mb-3">
+          \(
+          \boxed{\,h(t) \;=\; \Big(\sqrt{h_0} - \dfrac{a}{2A}\sqrt{2g}\;t\Big)^2\,}
+          \quad \text{(mientras \(h\ge 0\)).}
+          \)
+        </p>
+
+        <!-- Paso 4: tiempo total de vaciado -->
+        <h6 class="mb-2">Paso 4. Tiempo total de vaciado \(T\)</h6>
+        <p>
+          El vaciado ocurre cuando \(h(T)=0\), es decir \(\sqrt{h_0} - \dfrac{a}{2A}\sqrt{2g}\,T=0\).
+          Por tanto:
+        </p>
+        <p class="fs-5 text-center">
+          \(
+          \boxed{\,T \;=\; \frac{2A}{a}\,\frac{\sqrt{h_0}}{\sqrt{2g}}
+          \;=\; \frac{A}{a}\,\sqrt{\frac{2h_0}{g}}\,}
+          \)
+        </p>
+
+        <div class="alert alert-secondary mt-3">
+          <strong>Lectura física:</strong> \(T\) crece linealmente con \(A/a\) (tanque más ancho u orificio más chico)
+          y con \(\sqrt{h_0}\). Disminuye si \(g\) es mayor.
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Calculadora y gráfico -->
+  <div class="col-lg-5">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h5 class="card-title">Calculadora y gráfico de \(h(t)\)</h5>
+
+        <form method="post" class="row gy-3" id="formIntegracion">
+          <div class="col-6">
+            <label class="form-label">Área del tanque \(A\) [m²]</label>
+            <input type="number" step="0.0001" min="0" class="form-control" name="A" id="AInput" value="{{ A }}">
+          </div>
+          <div class="col-6">
+            <label class="form-label">Área del orificio \(a\) [m²]</label>
+            <input type="number" step="0.000001" min="0" class="form-control" name="a" id="aInput" value="{{ a }}">
+          </div>
+          <div class="col-6">
+            <label class="form-label">Gravedad \(g\) [m/s²]</label>
+            <input type="number" step="0.01" min="0" class="form-control" name="g" id="gInput" value="{{ g }}">
+          </div>
+          <div class="col-6">
+            <label class="form-label">Altura inicial \(h_0\) [m]</label>
+            <input type="number" step="0.001" min="0" class="form-control" name="h0" id="h0Input" value="{{ h0 }}">
+          </div>
+
+          <div class="col-12 d-flex gap-2">
+            <button class="btn btn-primary" type="submit">Calcular (POST)</button>
+            <button class="btn btn-outline-secondary" type="button" id="btnPlot">Calcular en vivo</button>
+          </div>
+        </form>
+
+        <div class="card shadow-sm mt-3 tank-card">
+  <div class="card-body">
+    <h5 class="card-title mb-3">Diagrama del tanque (dinámico)</h5>
+
+    <!-- Control de tiempo para ver la altura h(t) en el dibujo -->
+    <div class="row g-2 align-items-center mb-2">
+      <div class="col-sm-8">
+        <label class="form-label mb-0">Tiempo t [s] (para vista del diagrama)</label>
+        <input type="range" class="form-range" min="0" max="1" step="0.01" id="tRange" value="0">
+      </div>
+      <div class="col-sm-4 text-sm-end">
+        <span class="badge-soft">t = <span id="tVal" class="mathmono">0.00</span> s</span>
+        <span class="badge-soft ms-2">h(t) = <span id="hVal" class="mathmono">—</span> m</span>
+      </div>
+    </div>
+
+    <div class="tank-wrap">
+      <!-- SVG del tanque -->
+      <svg id="tankSvg" viewBox="0 0 300 360" width="300" height="360" aria-label="Tanque cilíndrico">
+        <!-- Parámetros de geometría en pixeles -->
+        <!-- Top ellipse center (150,60), bottom ellipse center (150,300) -->
+        <!-- Altura interna efectiva  = 220 px (de 80 a 300) -->
+        <!-- Paredes -->
+        <defs>
+          <clipPath id="tankClip">
+            <!-- Silueta interior para recortar el agua -->
+            <path d="
+              M 70,60
+              C 70,46 102,36 150,36
+              C 198,36 230,46 230,60
+              L 230,300
+              C 230,314 198,324 150,324
+              C 102,324 70,314 70,300
+              Z" />
+          </clipPath>
+        </defs>
+
+        <!-- Contorno del tanque -->
+        <!-- Tapa superior (elipse) -->
+        <ellipse cx="150" cy="60" rx="80" ry="24" fill="none" stroke="#222" stroke-width="2"/>
+        <!-- Paredes -->
+        <line x1="70" y1="60" x2="70" y2="300" stroke="#222" stroke-width="2"/>
+        <line x1="230" y1="60" x2="230" y2="300" stroke="#222" stroke-width="2"/>
+        <!-- Base (elipse) -->
+        <ellipse cx="150" cy="300" rx="80" ry="24" fill="none" stroke="#222" stroke-width="2"/>
+
+        <!-- AGUA (recortada por el tanque) -->
+        <g clip-path="url(#tankClip)" id="waterGroup">
+          <!-- cuerpo de agua -->
+          <rect id="waterRect" x="70" y="300" width="160" height="0" fill="#6ec1ff" opacity="0.75"/>
+          <!-- superficie (elipse) -->
+          <ellipse id="waterTop" cx="150" cy="300" rx="80" ry="24" fill="#bfe7ff" opacity="0.85" />
+        </g>
+
+        <!-- Flecha de altura h(t) -->
+        <line id="hArrowUp"   x1="260" y1="300" x2="260" y2="300" stroke="#222" stroke-width="2" marker-end="url(#arrow)"/>
+        <line id="hArrowDown" x1="260" y1="300" x2="260" y2="300" stroke="#222" stroke-width="2" marker-end="url(#arrow)"/>
+        <text id="hLabel" x="266" y="190" font-size="12" fill="#222">h(t)</text>
+
+        <!-- Marcas y textos A, a -->
+        <text id="Atext"  x="20"  y="24"  font-size="13" class="mathmono">A = πR² = — m²</text>
+        <text id="atext"  x="20"  y="42"  font-size="13" class="mathmono">a = πr² = — m²</text>
+        <text id="Rtext"  x="200" y="24"  font-size="12" class="mathmono">R = — m</text>
+        <text id="rtext"  x="200" y="42"  font-size="12" class="mathmono">r = — m</text>
+
+        <!-- Definición de flecha -->
+        <defs>
+          <marker id="arrow" markerWidth="10" markerHeight="10" refX="6" refY="3" orient="auto" markerUnits="strokeWidth">
+            <path d="M0,0 L0,6 L6,3 z" fill="#222" />
+          </marker>
+        </defs>
+      </svg>
+
+      <!-- Regla amarilla a la derecha (estética como tu imagen) -->
+      <div class="tank-rail d-none d-md-block"></div>
+    </div>
+
+    <div class="tank-legend mt-3">
+      <small class="text-muted">El agua (azul) se dibuja con \(h(t)\) calculada a partir de tus parámetros.
+      El control de tiempo ajusta solo la **vista** del diagrama (no cambia la gráfica).</small>
+    </div>
+  </div>
+</div>
+
+        <hr>
+        <div id="resultadoT">
+          {% if T is not none %}
+            <p class="mb-1">Tiempo total de vaciado (POST):</p>
+            <p class="fs-5">\( T = {{ '%.4f'|format(T) }} \,\text{s} \)</p>
+          {% else %}
+            <p class="text-muted">Ingresa parámetros para ver \(T\).</p>
+          {% endif %}
+        </div>
+
+        <canvas id="chartH" height="220" class="mt-2"></canvas>
+        <div class="small text-muted mt-2">El gráfico corta en \(T\). Para \(t&gt;T\), \(h(t)=0\).</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// =====================
+//  Utilidades comunes
+// =====================
+const $ = (id) => document.getElementById(id);
+
+// Lee parámetros del formulario
+function paramsFromInputs(){
+  const A  = parseFloat($('AInput')?.value);
+  const a  = parseFloat($('aInput')?.value);
+  const g  = parseFloat($('gInput')?.value);
+  const h0 = parseFloat($('h0Input')?.value);
+  return {A, a, g, h0};
+}
+// Modelo analítico
+function computeT(A,a,g,h0){
+  if(!(A>0 && a>0 && g>=0 && h0>=0)) return null;
+  const k = (a/A) * Math.sqrt(2*g);
+  return (2*Math.sqrt(h0))/k; // = (A/a)*Math.sqrt(2*h0/g)
+}
+function h_of_t(t, A,a,g,h0){
+  const term = Math.sqrt(h0) - (a/(2*A))*Math.sqrt(2*g)*t;
+  return Math.max(0, term*term);
+}
+
+// =====================
+//  Chart.js (curva + sombra + marcador)
+// =====================
+let chart = null;
+const CURVE = { T:null, labels:[], data:[] };
+const DS_CURVE  = 0, DS_SHADE = 1, DS_MARKER = 2;
+
+function makeShadeDataset(){
+  return {
+    label: 'Área hasta t',
+    data: [],
+    fill: 'origin',
+    backgroundColor: 'rgba(30,144,255,0.20)',
+    borderWidth: 0,
+    pointRadius: 0,
+    tension: 0.15
+  };
+}
+function makeMarkerDataset(){
+  return {
+    label: 't actual',
+    data: [],
+    showLine: false,
+    borderColor: 'rgba(0,0,0,0)',
+    pointRadius: 5,
+    pointHoverRadius: 6
+  };
+}
+function ensureShadeAndMarkerDatasets(c){
+  const ds = c.data.datasets;
+  if (ds.length < 2) ds[1] = makeShadeDataset();
+  if (ds.length < 3) ds[2] = makeMarkerDataset();
+}
+
+function getOrCreateChart(){
+  const canvas = $('chartH');
+  if (!canvas) return null;
+  const existing = Chart.getChart(canvas);
+  if (existing){ chart = existing; ensureShadeAndMarkerDatasets(chart); return chart; }
+  chart = new Chart(canvas.getContext('2d'), {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: [
+        { label: 'h(t) [m]', data: [], tension: 0.15 },
+        makeShadeDataset(),
+        makeMarkerDataset()
+      ]
+    },
+    options: {
+      responsive: true,
+      animation: false,
+      scales: {
+        x: { title: { display: true, text: 't [s]' } },
+        y: { title: { display: true, text: 'h [m]' }, beginAtZero: true }
+      },
+      plugins: { legend: { display: true } }
+    }
+  });
+  return chart;
+}
+
+function plotFromInputs(){
+  const resDiv = $('resultadoT');
+  const {A,a,g,h0} = paramsFromInputs();
+  const T = computeT(A,a,g,h0);
+
+  if (!chart) getOrCreateChart();
+  if (!chart) return;
+  ensureShadeAndMarkerDatasets(chart);
+
+  if (T == null || !isFinite(T)) {
+    if (resDiv) resDiv.innerHTML = '<p class="text-danger">Parámetros inválidos.</p>';
+    chart.data.labels = [];
+    chart.data.datasets[DS_CURVE].data  = [];
+    chart.data.datasets[DS_SHADE].data  = [];
+    chart.data.datasets[DS_MARKER].data = [];
+    chart.update();
+    return;
+  }
+
+  // Mostrar T
+  if (resDiv) {
+    resDiv.innerHTML =
+      `<p class="mb-1">Tiempo total de vaciado (en vivo):</p>
+       <p class="fs-5">\\( T = ${T.toFixed(4)}\\,\\text{s} \\)</p>`;
+    if (window.MathJax && MathJax.typesetPromise) MathJax.typesetPromise();
+  }
+
+  // Construir curva
+  const N = 60;
+  const labels = [];
+  const data   = [];
+  for (let i=0;i<=N;i++){
+    const t = T * i / N;
+    labels.push(t.toFixed(2));
+    data.push(h_of_t(t, A,a,g,h0));
+  }
+  chart.data.labels = labels;
+  chart.data.datasets[DS_CURVE].data = data;
+
+  // Guardar estado para slider
+  CURVE.T = T; CURVE.labels = labels; CURVE.data = data;
+
+  // Ajustar slider a [0,T] y sombrear con t actual
+  const tSlider = $('tRange');
+  if (tSlider) {
+    tSlider.max = T.toFixed(6);
+    if (parseFloat(tSlider.value) > T) tSlider.value = T;
+  }
+  updateShadingFromSlider();
+  chart.update('none');
+}
+
+function updateShadingFromSlider(){
+  const tSlider = $('tRange');
+  if (!tSlider || CURVE.T == null) return;
+  const t = Math.min(parseFloat(tSlider.value)||0, CURVE.T);
+  updateShadingAtTime(t);
+}
+function updateShadingAtTime(t){
+  if (CURVE.T == null || !isFinite(CURVE.T) || !chart) return;
+  ensureShadeAndMarkerDatasets(chart);
+  const N = CURVE.labels.length - 1;
+  const idx = Math.max(0, Math.min(N, Math.round((t / CURVE.T) * N)));
+  chart.data.datasets[DS_SHADE].data  = CURVE.data.map((v,i)=> i<=idx ? v : null);
+  chart.data.datasets[DS_MARKER].data = CURVE.data.map((v,i)=> i===idx ? v : null);
+  chart.update('none');
+}
+
+// =====================
+//  Diagrama SVG (tanque)
+// =====================
+const TANK_BOT_Y = 300;
+const INNER_HEIGHT_PX = 220;
+const RX = 80, RY = 24;
+
+function drawWater(h, h0){
+  const waterRect = $('waterRect');
+  const waterTop  = $('waterTop');
+  if (!waterRect || !waterTop) return;
+  const hRel = (h0>0) ? Math.min(Math.max(h/h0, 0), 1) : 0;
+  const yTop = TANK_BOT_Y - hRel*INNER_HEIGHT_PX;
+
+  const bodyHeight = Math.max(0, (TANK_BOT_Y - yTop));
+  waterRect.setAttribute('y', yTop);
+  waterRect.setAttribute('height', bodyHeight);
+
+  waterTop.setAttribute('cy', yTop);
+  waterTop.setAttribute('rx', RX);
+  waterTop.setAttribute('ry', RY);
+
+  const hUp   = $('hArrowUp');
+  const hDown = $('hArrowDown');
+  const hLbl  = $('hLabel');
+  if (hUp && hDown && hLbl){
+    hUp.setAttribute('x1', 260); hUp.setAttribute('x2', 260);
+    hDown.setAttribute('x1', 260); hDown.setAttribute('x2', 260);
+    hUp.setAttribute('y1', TANK_BOT_Y);
+    hUp.setAttribute('y2', yTop+4);
+    hDown.setAttribute('y1', yTop+4);
+    hDown.setAttribute('y2', TANK_BOT_Y);
+    hLbl.setAttribute('x', 266);
+    hLbl.setAttribute('y', (yTop + TANK_BOT_Y)/2 - 6);
+  }
+}
+
+function setLabels(A,a){
+  const Atext = $('Atext'), atext = $('atext'), Rtext = $('Rtext'), rtext = $('rtext');
+  const R = (A>0) ? Math.sqrt(A/Math.PI) : NaN;
+  const r = (a>0) ? Math.sqrt(a/Math.PI) : NaN;
+  if (Atext) Atext.textContent = `A = πR² = ${isFinite(A)?A.toFixed(4):'—'} m²`;
+  if (atext) atext.textContent = `a = πr² = ${isFinite(a)?a.toFixed(6):'—'} m²`;
+  if (Rtext) Rtext.textContent = `R = ${isFinite(R)?R.toFixed(4):'—'} m`;
+  if (rtext) rtext.textContent = `r = ${isFinite(r)?r.toFixed(4):'—'} m`;
+}
+
+function updateDiagram(){
+  const {A,a,g,h0} = paramsFromInputs();
+  const tSlider = $('tRange');
+  const tDisp   = $('tVal');
+  const hDisp   = $('hVal');
+
+  const T = computeT(A,a,g,h0);
+  if (!isFinite(T) || T<=0) {
+    if (tSlider) { tSlider.max = 1; tSlider.value = 0; }
+    if (tDisp) tDisp.textContent = '0.00';
+    if (hDisp) hDisp.textContent = '—';
+    drawWater(h0, h0);
+    setLabels(A,a);
+    return;
+  }
+
+  if (tSlider) tSlider.max = T.toFixed(6);
+  const t = Math.min(parseFloat(tSlider?.value)||0, T);
+  if (tSlider) tSlider.value = t;
+
+  const h = h_of_t(t, A,a,g,h0);
+  if (tDisp) tDisp.textContent = t.toFixed(2);
+  if (hDisp) hDisp.textContent = h.toFixed(4);
+
+  drawWater(h, h0);
+  setLabels(A,a);
+}
+
+// =====================
+//  Eventos e init
+// =====================
+$('btnPlot')?.addEventListener('click', () => {
+  plotFromInputs();
+  updateDiagram();
+});
+
+['AInput','aInput','gInput','h0Input'].forEach(id=>{
+  const el = $(id);
+  if (el) el.addEventListener('input', () => {
+    plotFromInputs();
+    updateDiagram();
+  });
+});
+
+$('tRange')?.addEventListener('input', () => {
+  updateShadingFromSlider();
+  updateDiagram();
+});
+
+window.addEventListener('load', () => {
+  getOrCreateChart();   // crea/reusa la instancia
+  plotFromInputs();     // curva + sombra
+  updateDiagram();      // diagrama
+});
+</script>
+
+
+{% endblock %}

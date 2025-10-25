@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+{% block title %}Bernoulli — Demo didáctica{% endblock %}
+{% block content %}
+
+<div class="row g-4">
+  <!-- Lado izquierdo: teoría paso a paso -->
+  <div class="col-lg-7">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h5 class="card-title mb-3">De Bernoulli a Torricelli (paso a paso)</h5>
+
+        <!-- Paso 0: enunciado con popovers -->
+        <div class="mb-3">
+
+        <p class="text-muted small mb-0">
+          El presente proyecto se realiza con el objetivo de poder asimilar lo visto en clase y poder interiorizarlo, para ello se repasará inicialmente como se obtiene la ecuacion diferecial que representa modelo matematico de "vaciado de tanques"
+          </p>
+          <hr>
+               <p class="text-muted small mb-0">
+          Se define la ecuacion de bernoulli,y se explican sus variables asi: 
+          </p>
+
+          <h6 class="mb-2">0. Enunciado de Bernoulli</h6>
+          <p class="display-6 fs-4">
+            <span class="popover-ltx" tabindex="0" data-bs-toggle="popover" data-bs-trigger="hover focus"
+                  data-bs-placement="top" data-bs-html="true" data-bs-title="Presión \(P\)"
+                  data-bs-content="Energía de presión por unidad de volumen. <br><small>Pa = N/m²</small>">
+              \( P \)
+            </span>
+            +
+            <span class="popover-ltx" tabindex="0" data-bs-toggle="popover" data-bs-trigger="hover focus"
+                  data-bs-placement="top" data-bs-html="true" data-bs-title="Densidad \(\rho\)"
+                  data-bs-content="Masa por unidad de volumen. <br><small>kg/m³</small>">
+              \( \rho \)
+            </span>
+            <span class="popover-ltx" tabindex="0" data-bs-toggle="popover" data-bs-trigger="hover focus"
+                  data-bs-placement="top" data-bs-html="true" data-bs-title="Gravedad \(g\)"
+                  data-bs-content="Aceleración de la gravedad. <br><small>m/s²</small>">
+              \( g \)
+            </span>
+            <span class="popover-ltx" tabindex="0" data-bs-toggle="popover" data-bs-trigger="hover focus"
+                  data-bs-placement="top" data-bs-html="true" data-bs-title="Altura \(h\)"
+                  data-bs-content="Cota respecto a una referencia. <br><small>m</small>">
+              \( h \)
+            </span>
+            +
+            \(\tfrac{1}{2}\)
+            <span class="popover-ltx" tabindex="0" data-bs-toggle="popover" data-bs-trigger="hover focus"
+                  data-bs-placement="top" data-bs-html="true" data-bs-title="Densidad \(\rho\)"
+                  data-bs-content="También aparece en el término cinético.">
+              \( \rho \)
+            </span>
+            <span class="popover-ltx" tabindex="0" data-bs-toggle="popover" data-bs-trigger="hover focus"
+                  data-bs-placement="top" data-bs-html="true" data-bs-title="Velocidad \(v\)"
+                  data-bs-content="Rapidez del fluido en la línea de corriente. <br><small>m/s</small>">
+              \( v^2 \)
+            </span>
+           = constante
+          </p>
+          <p class="text-muted small mb-0">
+            Suma de: presión + potencial gravitatorio + cinético, constante sobre una línea de corriente
+            (fluido ideal, estacionario).
+          </p>
+        </div>
+
+        <hr>
+
+        <!-- Paso 1 -->
+        <div class="mb-4">
+          <h6 class="mb-2">1. Elegimos dos puntos</h6>
+          <ul class="mb-2">
+            <li><strong>Punto 1</strong> (superficie): \(P_1 = P_{atm}\), \(v_1 \approx 0\), \(h_1 = h\).</li>
+            <li><strong>Punto 2</strong> (orificio): \(P_2 = P_{atm}\), \(v_2 = v_{out}\), \(h_2 = 0\).</li>
+          </ul>
+          <p class="text-muted small">Justificación: tanque grande (superficie se mueve lento) y la salida descarga a la atmósfera.</p>
+        </div>
+
+        <!-- Paso 2 -->
+        <div class="mb-4">
+          <h6 class="mb-2">2. Escribimos Bernoulli entre 1 y 2</h6>
+          <p class="fs-5 text-center mb-2">
+            \( P_1 + \rho g h_1 + \tfrac{1}{2}\rho v_1^2
+               \;=\;
+               P_2 + \rho g h_2 + \tfrac{1}{2}\rho v_2^2 \)
+          </p>
+        </div>
+
+        <!-- Paso 3 -->
+        <div class="mb-4">
+          <h6 class="mb-2">3. Sustituimos valores de cada punto</h6>
+          <p class="fs-5 text-center mb-2">
+            \( P_{atm} + \rho g h + \tfrac{1}{2}\rho (0)^2
+               \;=\;
+               P_{atm} + \rho g (0) + \tfrac{1}{2}\rho v_{out}^2 \)
+          </p>
+        </div>
+
+        <!-- Paso 4 -->
+        <div class="mb-4">
+          <h6 class="mb-2">4. Simplificamos presiones y términos</h6>
+          <p class="text-muted small">Como \(P_{atm}\) aparece en ambos lados, se cancela. Además \( (0)^2 = 0\) y \(g\cdot 0=0\).</p>
+          <p class="fs-5 text-center mb-2">\( \rho g h = \tfrac{1}{2}\rho v_{out}^2 \)</p>
+        </div>
+
+        <!-- Paso 5 -->
+        <div class="mb-2">
+          <h6 class="mb-2">5. Despejamos la velocidad de salida</h6>
+          <ol class="mb-2">
+            <li>Dividimos ambos lados por \(\rho\) (siempre \( \rho>0 \)): \( g h = \tfrac{1}{2} v_{out}^2 \).</li>
+            <li>Multiplicamos por 2: \( 2 g h = v_{out}^2 \).</li>
+            <li>Raíz cuadrada (velocidad positiva): \( v_{out} = \sqrt{2gh} \).</li>
+          </ol>
+          <p class="fs-5 text-center mb-0">
+            \( \boxed{\,v_{out} = \sqrt{2gh}\,} \) <span class="text-muted">(Ley de Torricelli)</span>
+          </p>
+        </div>
+
+        <hr>
+
+        <h6>Supuestos (por qué funciona)</h6>
+        <ol class="mb-0">
+          <li>Fluido incompresible y sin viscosidad significativa.</li>
+          <li>Flujo estacionario.</li>
+          <li>Misma línea de corriente entre superficie y orificio.</li>
+          <li>Salida a presión atmosférica.</li>
+          <a class="btn btn-outline-secondary mt-2" href="{{ url_for('continuidad') }}">
+  Ver continuidad y ecuación de vaciado →
+</a>
+
+        </ol>
+      </div>
+    </div>
+  </div>
+
+  <!-- Lado derecho: calculadora -->
+  <div class="col-lg-5">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h5 class="card-title">Calculadora interactiva</h5>
+        <form method="post" class="row gy-3" id="formTorricelli">
+          <div class="col-12">
+            <label class="form-label">Gravedad \(g\) [m/s²]</label>
+            <input type="number" step="0.01" class="form-control" id="gInput" name="g" value="{{ g }}" />
+            <div class="form-text">Usa 9.8 por defecto.</div>
+          </div>
+          <div class="col-12">
+            <label class="form-label">Altura \(h\) [m]</label>
+            <input type="range" min="0" max="5" step="0.01" class="form-range" id="hRange" value="{{ h or 1.0 }}">
+            <input type="number" step="0.01" class="form-control mt-2" id="hInput" name="h" value="{{ h or 1.0 }}">
+          </div>
+          <div class="col-12 d-flex gap-2">
+          
+            <button class="btn btn-outline-secondary" type="button" id="btnLive">Calcular en vivo</button>
+          </div>
+        </form>
+
+        <hr>
+        <div id="resultado">
+          {% if v is not none %}
+            <p class="mb-1">Resultado (POST):</p>
+            <p class="fs-5">\( v = \sqrt{2 g h} = {{ '%.4f'|format(v) }} \,\text{m/s} \)</p>
+          {% else %}
+            <p class="text-muted">Ingresa una altura para ver \(v\).</p>
+          {% endif %}
+        </div>
+
+        <div class="mt-3 small text-muted">
+          * “Calcular en vivo” muestra el resultado sin recargar la página.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

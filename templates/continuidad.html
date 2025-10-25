@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block title %}Continuidad — Ecuación del vaciado{% endblock %}
+{% block content %}
+
+<div class="row g-4">
+  <div class="col-lg-8">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h4 class="card-title mb-3">Ecuación de vaciado por continuidad (paso a paso)</h4>
+
+        <!-- Paso 1: Torricelli -->
+        <h6 class="mb-2">Paso 1. Velocidad de salida (Torricelli)</h6>
+        <p>Aplicando Bernoulli entre la superficie y el orificio (con \(P_1=P_2=P_{atm}\), \(v_1\approx0\), \(h_2=0\)) se obtiene:</p>
+        <p class="fs-5 text-center">\( v_{out} \;=\; \sqrt{2gh} \).</p>
+
+        <hr>
+
+        <!-- Paso 2: volumen que sale -->
+        <h6 class="mb-2">Paso 2. Volumen que sale por el orificio</h6>
+        <p>Si el orificio tiene área \( a \) y la velocidad es \( v_{out} \), en un intervalo pequeño \( dt \) el agua recorre \(v_{out}\,dt\). Por tanto,</p>
+        <p class="fs-5 text-center">\( dV_{out} \;=\; a\,\big(v_{out}\,dt\big) \;=\; a\,v_{out}\,dt \).</p>
+        <p class="text-muted small">Regla geométrica: área × distancia = volumen.</p>
+
+        <hr>
+
+        <!-- Paso 3: volumen que pierde el tanque -->
+        <h6 class="mb-2">Paso 3. Volumen que pierde el tanque</h6>
+        <p>Si la sección transversal del tanque es \( A \) y el nivel baja un poco \( dh \), el volumen perdido es:</p>
+        <p class="fs-5 text-center">\( dV_{tanque} \;=\; A\,dh \).</p>
+
+        <hr>
+
+        <!-- Paso 4: continuidad -->
+        <h6 class="mb-2">Paso 4. Conservación de masa (continuidad)</h6>
+        <p>Lo que sale es lo que pierde el tanque. Como el tanque disminuye su volumen, agregamos signo negativo:</p>
+        <p class="fs-5 text-center mb-1">\( dV_{tanque} \;=\; -\,dV_{out} \)</p>
+        <p class="fs-5 text-center mb-2">\( \Rightarrow\quad A\,dh \;=\; -\,a\,v_{out}\,dt \)</p>
+        <p class="text-muted small">Esta es la igualdad clave que liga el descenso del nivel con el caudal de salida.</p>
+
+        <hr>
+
+        <!-- Paso 5: sustitución y despeje detallado -->
+        <h6 class="mb-2">Paso 5. Sustituimos \( v_{out} \) y despejamos \( \dfrac{dh}{dt} \)</h6>
+        <p>Usamos \( v_{out}=\sqrt{2gh} \) en la ecuación anterior y despejamos **sin saltar pasos**:</p>
+
+        <ol class="mb-3">
+          <li class="mb-2">
+            Sustitución de Torricelli:<br>
+            <div class="text-center my-1">\( A\,dh \;=\; -\,a\,\sqrt{2gh}\,dt \)</div>
+          </li>
+          <li class="mb-2">
+            Dividir ambos lados entre \(dt\) (\(dt\neq 0\)) para pasar a **tasas**:<br>
+            <div class="text-center my-1">\( A\,\dfrac{dh}{dt} \;=\; -\,a\,\sqrt{2gh} \)</div>
+          </li>
+          <li class="mb-2">
+            Dividir ambos lados entre \(A\) (\(A>0\)) para aislar \(\dfrac{dh}{dt}\):<br>
+            <div class="text-center my-1">\( \displaystyle \frac{dh}{dt} \;=\; -\,\frac{a}{A}\,\sqrt{2gh} \)</div>
+          </li>
+        </ol>
+
+        <div class="alert alert-secondary">
+          <strong>Sobre el signo “–”:</strong> el nivel \(h\) disminuye cuando el tanque se vacía, por eso
+          \(\frac{dh}{dt}&lt;0\). El signo negativo viene de imponer \(dV_{tanque}=-\,dV_{out}\).
+        </div>
+
+        <hr>
+
+        <!-- Paso 5b: misma idea con tasas -->
+        <details class="mt-2">
+          <summary class="fw-semibold">La misma deducción, directamente con tasas (sin diferenciales)</summary>
+          <div class="pt-2">
+            <p>Caudal que sale: \( \dfrac{dV_{out}}{dt}=a\,v_{out} \).<br>
+               Caudal “que pierde” el tanque: \( \dfrac{dV_{tanque}}{dt}=A\,\dfrac{dh}{dt} \).<br>
+               Continuidad: \( \dfrac{dV_{tanque}}{dt}=-\,\dfrac{dV_{out}}{dt} \Rightarrow A\,\dfrac{dh}{dt}=-\,a\,v_{out} \).<br>
+               Sustituyendo \( v_{out}=\sqrt{2gh} \): \( \dfrac{dh}{dt}=-(a/A)\sqrt{2gh}. \)
+            </p>
+          </div>
+        </details>
+
+        <hr>
+
+        <!-- Paso 6: hacia la solución -->
+        <h6 class="mb-2">Paso 6 (opcional). Hacia el tiempo de vaciado</h6>
+        <p>Separando variables:
+          \( \displaystyle \frac{dh}{\sqrt{h}} = -\,\frac{a}{A}\sqrt{2g}\;dt \). Integrando desde \(h(0)=h_0\)
+          puedes obtener \(h(t)\) y el tiempo total de vaciado \(T\). S</p>
+
+        <a class="btn btn-outline-primary" href="{{ url_for('index') }}">← Volver a Bernoulli/Torricelli</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Lateral con resumen -->
+  <div class="col-lg-4">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h5 class="card-title">Resumen rápido</h5>
+        <ul class="small">
+          <li>\(v_{out}=\sqrt{2gh}\) (Torricelli).</li>
+          <li>\(dV_{out}=a\,v_{out}\,dt\).</li>
+          <li>\(dV_{tanque}=A\,dh\).</li>
+          <li>Continuidad: \(A\,dh=-a\,v_{out}\,dt\).</li>
+          <li>\(\dfrac{dh}{dt}=-(a/A)\sqrt{2gh}\).</li>
+        </ul>
+        <hr>
+        <p class="small text-muted mb-0">
+          Válido aprox. para fluido incompresible, orificio pequeño, descarga a atmósfera y flujo casi estacionario.
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

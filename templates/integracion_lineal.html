@@ -1,0 +1,690 @@
+{% extends "base.html" %}
+{% block title %}Modelo lineal — Cono perfecto y truncado (dinámico){% endblock %}
+{% block head %}
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    .badge-soft{background:#eef2ff;color:#1e2a78;border:1px solid #c7d2fe;border-radius:8px;padding:2px 8px;font-size:.8rem;}
+    .mathmono{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;}
+    .param-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;}
+    .param-grid .full{grid-column:1 / -1}
+    .hidden{display:none}
+    .step{margin-bottom:.75rem}
+    .tank-wrap{display:flex;gap:16px;align-items:flex-start}
+    .tank-rail{width:10px;background:#ffd400;border-radius:3px;margin-top:10px;height:340px}
+    .slider-container{display:flex;align-items:center;gap:10px;}
+    .slider-value{min-width:60px;text-align:center;}
+    .formula-step{background:#f8f9fa;border-left:4px solid #0d6efd;padding:12px;margin:8px 0;border-radius:4px;}
+    .formula-explanation{color:#6c757d;font-size:0.9em;margin-top:4px;}
+    
+    /* Mejoras visuales para los combos */
+    .form-control, .form-select {
+      border: 2px solid #e9ecef;
+      border-radius: 8px;
+      transition: all 0.3s ease;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    
+    .form-control:focus, .form-select:focus {
+      border-color: #0d6efd;
+      box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.15);
+      transform: translateY(-1px);
+    }
+    
+    .form-control:hover, .form-select:hover {
+      border-color: #adb5bd;
+    }
+    
+    .btn-primary {
+      background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
+      border: none;
+      border-radius: 8px;
+      font-weight: 600;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 6px rgba(13, 110, 253, 0.2);
+    }
+    
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 12px rgba(13, 110, 253, 0.3);
+    }
+    
+    .card {
+      border: none;
+      border-radius: 12px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+      transition: all 0.3s ease;
+    }
+    
+    .card:hover {
+      box-shadow: 0 8px 15px rgba(0, 0, 0, 0.1);
+    }
+    
+    /* Mejoras para el slider del tiempo */
+    .time-slider-container {
+      background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+      padding: 15px;
+      border-radius: 10px;
+      border: 2px solid #e9ecef;
+    }
+    
+    .form-range {
+      height: 8px;
+      border-radius: 4px;
+    }
+    
+    .form-range::-webkit-slider-thumb {
+      background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
+      border: none;
+      height: 20px;
+      width: 20px;
+      border-radius: 50%;
+      box-shadow: 0 2px 6px rgba(13, 110, 253, 0.4);
+    }
+    
+    .form-range::-moz-range-thumb {
+      background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
+      border: none;
+      height: 20px;
+      width: 20px;
+      border-radius: 50%;
+      box-shadow: 0 2px 6px rgba(13, 110, 253, 0.4);
+    }
+    
+    /* Mejoras para las badges */
+    .badge-soft {
+      background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%);
+      border: 1px solid #c7d2fe;
+      border-radius: 10px;
+      padding: 6px 12px;
+      font-weight: 500;
+    }
+  </style>
+{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+  <!-- Lado explicativo -->
+  <div class="col-lg-7">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h4 class="card-title mb-3">De continuidad + Torricelli a \(h(t)\) con \(A(h)\) lineal</h4>
+
+        <p>Partimos de continuidad (fluido ideal) entre la superficie y el orificio:</p>
+        <p class="fs-5 text-center mb-2">\( A(h)\,\dfrac{dh}{dt} = -\,a\,\sqrt{2g\,h}\,.\)</p>
+        <p class="mb-3">Aquí \(a=\pi r_{\text{hole}}^2\) es el área del orificio; la diferencia entre modelos está en \(A(h)\).</p>
+
+        <hr>
+
+        <h5 class="mb-3">¿Cómo se obtiene \(A(h)\) a partir de una recta?</h5>
+        
+        <div class="step">
+          <strong>Paso 0.</strong> Definimos los puntos del perfil del tanque:
+          <div class="formula-step">
+            <div>Base: \((r, 0)\) &nbsp;&nbsp; (radio en el fondo, altura 0)</div>
+            <div>Boca: \((R_0, H)\) &nbsp;&nbsp; (radio en la parte superior, altura total)</div>
+            <div class="formula-explanation">El tanque tiene forma de cono (o tronco de cono) con el vértice en la parte inferior.</div>
+          </div>
+        </div>
+
+        <div class="step">
+          <strong>Paso 1.</strong> Calculamos la pendiente de la recta que forma el perfil:
+          <div class="formula-step">
+            \( m = \dfrac{\text{cambio en altura}}{\text{cambio en radio}} = \dfrac{H - 0}{R_0 - r} \)
+            <div class="formula-explanation">Usamos la fórmula de pendiente: \( m = \frac{y_2 - y_1}{x_2 - x_1} \)</div>
+          </div>
+        </div>
+
+        <div class="step">
+          <strong>Paso 2.</strong> Escribimos la ecuación de la recta usando la forma punto-pendiente:
+          <div class="formula-step">
+            \( y - y_1 = m(x - x_1) \)
+            <div>Usando el punto base \((r, 0)\):</div>
+            \( y - 0 = \dfrac{H}{R_0 - r}(x - r) \)
+            <div>Despejamos \(x\) (que representa el radio):</div>
+            \( x = r + \dfrac{R_0 - r}{H}y \)
+            <div class="formula-explanation">Esta ecuación nos da el radio \(x\) en función de la altura \(y\)</div>
+          </div>
+        </div>
+
+        <div class="step">
+          <strong>Paso 3.</strong> Cambiamos la notación para nuestro contexto:
+          <div class="formula-step">
+            \( R(h) = r + \dfrac{R_0 - r}{H}h \)
+            <div class="formula-explanation">Donde \(R(h)\) es el radio del tanque a una altura \(h\) del fondo</div>
+          </div>
+        </div>
+
+        <div class="step">
+          <strong>Paso 4.</strong> Calculamos el área transversal \(A(h)\):
+          <div class="formula-step">
+            \( A(h) = \pi [R(h)]^2 = \pi \left(r + \dfrac{R_0 - r}{H}h\right)^2 \)
+            <div class="formula-explanation">El área de un círculo es \(\pi r^2\), aplicado a nuestro radio variable \(R(h)\)</div>
+          </div>
+        </div>
+
+        <div class="step">
+          <strong>Casos especiales:</strong>
+          <div class="formula-step">
+            <div><strong>Cono perfecto (\(r = 0\)):</strong></div>
+            \( R(h) = 0 + \dfrac{R_0 - 0}{H}h = \dfrac{R_0}{H}h \)
+            <div>\( A(h) = \pi \left(\dfrac{R_0}{H}h\right)^2 = \pi \dfrac{R_0^2}{H^2}h^2 \)</div>
+            <br>
+            <div><strong>Cono truncado (\(r > 0\)):</strong></div>
+            \( A(h) = \pi \left(r + \dfrac{R_0 - r}{H}h\right)^2 \)
+            <div class="formula-explanation">El cono perfecto tiene punta en el fondo, mientras que el truncado tiene un cuello</div>
+          </div>
+        </div>
+
+        <hr>
+
+        <h6 class="mb-2">Selecciona el modelo geométrico</h6>
+        <div class="d-flex gap-2 mb-2">
+          <select id="cone_modelSel" class="form-select" style="max-width:260px">
+            <option value="cone">Cono perfecto (punta ideal)</option>
+            <option value="trunc">Cono truncado (cuello \(r\))</option>
+          </select>
+          <span class="badge-soft">Al cambiar, se actualiza \(A(h)\), fórmulas y simulación.</span>
+        </div>
+
+        <h6 class="mb-2">\(A(h)\) del modelo seleccionado</h6>
+        <div id="cone_AhBox" class="fs-5 text-center mb-2"></div>
+        <div class="small text-muted" id="cone_AhNote"></div>
+
+        <!-- SECCIÓN NUEVA: Integración dinámica -->
+        <div id="cone_integrationSection" class="mt-4">
+          <h5 class="mb-3">Integración de la ecuación diferencial</h5>
+          <div id="cone_integrationContent">
+            <!-- Aquí se mostrará la integración según el modelo seleccionado -->
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Lado calculadora + gráfico + SVG -->
+  <div class="col-lg-5">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h5 class="card-title">Calculadora, gráfico y diagrama</h5>
+
+        <!-- Parámetros -->
+        <div class="param-grid mb-3">
+          <!-- comunes -->
+          <div>
+            <label class="form-label">Área orificio \(a\) [m²]</label>
+            <input id="cone_aInput" type="number" step="0.000001" min="0" class="form-control" value="0.0001">
+          </div>
+          <div>
+            <label class="form-label">Gravedad \(g\) [m/s²]</label>
+            <input id="cone_gInput" type="number" step="0.01" min="0" class="form-control" value="9.8">
+          </div>
+          <div>
+            <label class="form-label">Altura inicial \(h_0\) [m]</label>
+            <input id="cone_h0Input" type="number" step="0.001" min="0" class="form-control" value="1.0">
+          </div>
+
+          <!-- cono perfecto -->
+          <div id="cone_p_cone_R0">
+            <label class="form-label">Radio superior \(R_0\) [m]</label>
+            <input id="cone_R0Input" type="number" step="0.001" min="0" class="form-control" value="0.4">
+          </div>
+          <div id="cone_p_cone_H">
+            <label class="form-label">Altura total \(H\) [m]</label>
+            <input id="cone_HInput" type="number" step="0.001" min="0" class="form-control" value="1.0">
+          </div>
+
+          <!-- truncado -->
+          <div id="cone_p_trunc_r" class="hidden">
+            <label class="form-label">Cuello \(r\) [m]</label>
+            <input id="cone_rInput" type="number" step="0.001" min="0" class="form-control" value="0.05">
+          </div>
+          <div id="cone_p_trunc_R0" class="hidden">
+            <label class="form-label">Boca \(R_0\) [m]</label>
+            <input id="cone_R0tInput" type="number" step="0.001" min="0" class="form-control" value="0.4">
+          </div>
+          <div id="cone_p_trunc_H" class="hidden">
+            <label class="form-label">Altura \(H\) [m]</label>
+            <input id="cone_HtInput" type="number" step="0.001" min="0" class="form-control" value="1.0">
+          </div>
+
+          <div class="full">
+            <button id="cone_btnCalc" class="btn btn-primary w-100">Calcular y graficar</button>
+          </div>
+        </div>
+
+        <!-- Tiempo y T -->
+        <div class="time-slider-container mb-3">
+          <div class="d-flex flex-wrap align-items-center gap-3">
+            <div class="flex-grow-1">
+              <label class="form-label mb-2 fw-bold">Control de tiempo \(t\) [s]</label>
+              <input id="cone_tRange" type="range" min="0" max="1" step="0.01" class="form-range" value="0">
+            </div>
+            <div class="text-center">
+              <div class="badge-soft mb-2">t = <span id="cone_tVal" class="mathmono">0.00</span> s</div>
+              <div class="badge-soft mb-2">h(t) = <span id="cone_hVal" class="mathmono">—</span> m</div>
+              <div class="badge-soft">T = <span id="cone_Tval" class="mathmono">—</span> s</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Diagrama SVG -->
+        <div class="tank-wrap">
+          <svg id="coneSvg" viewBox="0 0 300 360" width="300" height="360" aria-label="Tanque cónico">
+            <!-- parámetros del canvas -->
+            <defs>
+              <linearGradient id="waterGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stop-color="#6ec1ff" stop-opacity="0.9"/>
+                <stop offset="100%" stop-color="#4fa8e4" stop-opacity="0.7"/>
+              </linearGradient>
+              <linearGradient id="waterSurface" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stop-color="#bfe7ff"/>
+                <stop offset="100%" stop-color="#a0d4ff"/>
+              </linearGradient>
+              <clipPath id="coneClip">
+                <path id="coneClipPath" d="" />
+              </clipPath>
+              <marker id="arrow" markerWidth="10" markerHeight="10" refX="6" refY="3" orient="auto" markerUnits="strokeWidth">
+                <path d="M0,0 L0,6 L6,3 z" fill="#222" />
+              </marker>
+            </defs>
+
+            <!-- Contorno (se recalcula el ancho superior/inferior) -->
+            <path id="coneOutline" d="" fill="none" stroke="#444" stroke-width="2.5"/>
+
+            <!-- Agua (recortada por el cono) -->
+            <g clip-path="url(#coneClip)" id="waterGroup">
+              <rect id="waterRect" x="0" y="300" width="300" height="0" fill="url(#waterGradient)"/>
+              <ellipse id="waterTop" cx="150" cy="300" rx="60" ry="18" fill="url(#waterSurface)" opacity="0.9" />
+            </g>
+
+            <!-- Flecha h(t) -->
+            <line id="hArrowUp"   x1="270" y1="300" x2="270" y2="300" stroke="#222" stroke-width="2" marker-end="url(#arrow)"/>
+            <line id="hArrowDown" x1="270" y1="300" x2="270" y2="300" stroke="#222" stroke-width="2" marker-end="url(#arrow)"/>
+            <text id="hLabel" x="276" y="190" font-size="12" fill="#222" font-weight="bold">h(t)</text>
+          </svg>
+
+          <div class="tank-rail d-none d-md-block"></div>
+        </div>
+
+        <!-- Gráfico -->
+        <canvas id="cone_chartH" height="220" class="mt-3"></canvas>
+
+        <div class="small text-muted mt-2">
+          * Cono perfecto: \(h(t)\) analítico. · Cono truncado: \(T\) analítico; \(h(t)\) por inversión numérica de \(t(h)\).
+          El **área bajo la curva** se sombrea hasta tu \(t\) actual, y el **punto** marca \(h(t)\).
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Namespace para el cono - todos los IDs empiezan con "cone_"
+const $cone = (id)=>document.getElementById('cone_'+id);
+const modelSel = $cone('modelSel');
+
+// ========== Texto dinámico Ah ==========
+function setAhBox(){
+  const m = modelSel.value;
+  const Ah = $cone('AhBox'), note=$cone('AhNote');
+  if(m==='cone'){
+    Ah.innerHTML = '\\(A(h)=\\pi\\,\\tfrac{R_0^2}{H^2}\\,h^2\\)';
+    note.textContent = 'Cono perfecto: R(h)=(R0/H)h.';
+  }else{
+    Ah.innerHTML = '\\(A(h)=\\pi\\,\\big(r+\\tfrac{R_0-r}{H}h\\big)^2\\)';
+    note.textContent = 'Cono truncado: R(h)=r+((R0-r)/H)h.';
+  }
+  if(window.MathJax?.typesetPromise) MathJax.typesetPromise();
+}
+
+// ========== Integración dinámica ==========
+function updateIntegrationContent(){
+  const m = modelSel.value;
+  const content = $cone('integrationContent');
+  
+  if(m === 'cone'){
+    content.innerHTML = `
+      <div class="step">
+        <strong>Paso 1.</strong> Separación de variables para cono perfecto:
+        <div class="formula-step">
+          \\( \\dfrac{dh}{dt} = -\\dfrac{a}{\\pi\\frac{R_0^2}{H^2}h^2}\\sqrt{2gh} \\)
+          <div>\\( \\dfrac{dh}{dt} = -\\dfrac{aH^2}{\\pi R_0^2}\\dfrac{\\sqrt{2g}}{h^{3/2}} \\)</div>
+          <div>\\( h^{3/2}\\,dh = -\\dfrac{aH^2}{\\pi R_0^2}\\sqrt{2g}\\,dt \\)</div>
+        </div>
+      </div>
+      
+      <div class="step">
+        <strong>Paso 2.</strong> Integramos con \\(h(0) = h_0\\):
+        <div class="formula-step">
+          \\( \\int_{h_0}^{h(t)} h^{3/2}\\,dh = -\\dfrac{aH^2}{\\pi R_0^2}\\sqrt{2g}\\int_0^t dt \\)
+          <div>\\( \\dfrac{2}{5}\\left(h^{5/2}(t) - h_0^{5/2}\\right) = -\\dfrac{aH^2}{\\pi R_0^2}\\sqrt{2g}\\,t \\)</div>
+        </div>
+      </div>
+      
+      <div class="step">
+        <strong>Paso 3.</strong> Despejamos \\(h(t)\\):
+        <div class="formula-step">
+          \\( h^{5/2}(t) = h_0^{5/2} - \\dfrac{5}{2}\\dfrac{aH^2}{\\pi R_0^2}\\sqrt{2g}\\,t \\)
+          <div>\\( h(t) = \\left(h_0^{5/2} - \\dfrac{5}{2}\\dfrac{aH^2}{\\pi R_0^2}\\sqrt{2g}\\,t\\right)^{2/5} \\)</div>
+        </div>
+      </div>
+      
+      <div class="step">
+        <strong>Paso 4.</strong> Tiempo total de vaciado \\(T\\):
+        <div class="formula-step">
+          \\( h(T) = 0 \\Rightarrow h_0^{5/2} = \\dfrac{5}{2}\\dfrac{aH^2}{\\pi R_0^2}\\sqrt{2g}\\,T \\)
+          <div>\\( T = \\dfrac{2\\pi R_0^2}{5aH^2\\sqrt{2g}}h_0^{5/2} \\)</div>
+        </div>
+      </div>
+    `;
+  } else {
+    content.innerHTML = `
+      <div class="step">
+        <strong>Paso 1.</strong> Separación de variables para cono truncado:
+        <div class="formula-step">
+          \\( \\dfrac{dh}{dt} = -\\dfrac{a}{\\pi\\left(r + \\frac{R_0-r}{H}h\\right)^2}\\sqrt{2gh} \\)
+          <div>\\( \\left(r + \\frac{R_0-r}{H}h\\right)^2\\dfrac{dh}{\\sqrt{h}} = -\\dfrac{a}{\\pi}\\sqrt{2g}\\,dt \\)</div>
+        </div>
+      </div>
+      
+      <div class="step">
+        <strong>Paso 2.</strong> Integramos con \\(h(0) = h_0\\):
+        <div class="formula-step">
+          \\( \\int_{h_0}^{h(t)} \\left(r + \\alpha h\\right)^2\\dfrac{dh}{\\sqrt{h}} = -\\dfrac{a}{\\pi}\\sqrt{2g}\\int_0^t dt \\)
+          <div>donde \\(\\alpha = \\dfrac{R_0-r}{H}\\)</div>
+          <div>\\( \\int \\left(r^2 h^{-1/2} + 2r\\alpha h^{1/2} + \\alpha^2 h^{3/2}\\right)dh = -\\dfrac{a}{\\pi}\\sqrt{2g}\\,t \\)</div>
+        </div>
+      </div>
+      
+      <div class="step">
+        <strong>Paso 3.</strong> Resolvemos la integral:
+        <div class="formula-step">
+          \\( 2r^2\\sqrt{h} + \\dfrac{4}{3}r\\alpha h^{3/2} + \\dfrac{2}{5}\\alpha^2 h^{5/2} \\Big|_{h_0}^{h(t)} = -\\dfrac{a}{\\pi}\\sqrt{2g}\\,t \\)
+          <div>\\( \\left[2r^2(\\sqrt{h(t)}-\\sqrt{h_0}) + \\dfrac{4}{3}r\\alpha(h^{3/2}(t)-h_0^{3/2}) + \\dfrac{2}{5}\\alpha^2(h^{5/2}(t)-h_0^{5/2})\\right] = -\\dfrac{a}{\\pi}\\sqrt{2g}\\,t \\)</div>
+        </div>
+      </div>
+      
+      <div class="step">
+        <strong>Paso 4.</strong> Tiempo total de vaciado \\(T\\):
+        <div class="formula-step">
+          \\( h(T) = 0 \\Rightarrow 2r^2\\sqrt{h_0} + \\dfrac{4}{3}r\\alpha h_0^{3/2} + \\dfrac{2}{5}\\alpha^2 h_0^{5/2} = \\dfrac{a}{\\pi}\\sqrt{2g}\\,T \\)
+          <div>\\( T = \\dfrac{\\pi}{a\\sqrt{2g}}\\left(2r^2\\sqrt{h_0} + \\dfrac{4}{3}r\\alpha h_0^{3/2} + \\dfrac{2}{5}\\alpha^2 h_0^{5/2}\\right) \\)</div>
+        </div>
+      </div>
+      
+      <div class="step">
+        <strong>Nota:</strong> Para obtener \\(h(t)\\) se requiere invertir numéricamente la relación \\(t(h)\\).
+      </div>
+    `;
+  }
+  
+  if(window.MathJax?.typesetPromise) MathJax.typesetPromise();
+}
+
+// ========== Visibilidad de parámetros ==========
+function updateParamVisibility(){
+  const m=modelSel.value;
+  
+  // Ocultar/mostrar inputs numéricos
+  ['p_trunc_r','p_trunc_R0','p_trunc_H'].forEach(id=>$cone(id).classList.add('hidden'));
+  ['p_cone_R0','p_cone_H'].forEach(id=>$cone(id).classList.add('hidden'));
+  
+  if(m==='cone'){
+    $cone('p_cone_R0').classList.remove('hidden');
+    $cone('p_cone_H').classList.remove('hidden');
+  }else{
+    $cone('p_trunc_r').classList.remove('hidden');
+    $cone('p_trunc_R0').classList.remove('hidden');
+    $cone('p_trunc_H').classList.remove('hidden');
+  }
+  setAhBox();
+  updateIntegrationContent();
+}
+
+// ========== Modelo físico: h(t) y T ==========
+function cone_consts(R0,H,a,g){
+  const K = (a*Math.pow(H,2)/(Math.PI*Math.pow(R0,2))) * Math.sqrt(2*g);
+  return {K};
+}
+function cone_T(R0,H,a,g,h0){
+  const {K}=cone_consts(R0,H,a,g);
+  return (2/(5*K))*Math.pow(h0,2.5);
+}
+function cone_h(t,R0,H,a,g,h0){
+  const {K}=cone_consts(R0,H,a,g);
+  const inside = Math.pow(h0,2.5) - (5/2)*K*t;
+  return Math.max(0, Math.pow(Math.max(0,inside), 2/5));
+}
+
+// Cono truncado: T analítico y h(t) por inversión de t(h)
+function trunc_alpha(R0,H,r){ return (R0 - r)/H; }
+function trunc_t_of_h(h, R0,H,r, a,g, h0){
+  const alpha = trunc_alpha(R0,H,r);
+  const c = Math.PI/(a*Math.sqrt(2*g));
+  const t = c * (
+    2*r*r*(Math.sqrt(h0)-Math.sqrt(h)) +
+    (4*r*alpha/3)*(Math.pow(h0,1.5)-Math.pow(h,1.5)) +
+    (2*alpha*alpha/5)*(Math.pow(h0,2.5)-Math.pow(h,2.5))
+  );
+  return t;
+}
+function trunc_T(R0,H,r, a,g, h0){ return trunc_t_of_h(0,R0,H,r,a,g,h0); }
+function trunc_h_by_bisect(t, R0,H,r,a,g,h0){
+  let lo=0, hi=h0;
+  for(let it=0; it<60; it++){
+    const mid = 0.5*(lo+hi);
+    const tm = trunc_t_of_h(mid, R0,H,r, a,g, h0);
+    if (tm>t) lo=mid; else hi=mid; // t(h) decrece con h
+  }
+  return 0.5*(lo+hi);
+}
+
+// ========== Chart.js con sombreado y marcador ==========
+let cone_chart=null;
+const CONE_CURVE = { T:null, labels:[], data:[] };
+const DS_CURVE=0, DS_SHADE=1, DS_MARKER=2;
+
+function makeShadeDataset(){
+  return { label:'Área hasta t', data:[], fill:'origin', backgroundColor:'rgba(30,144,255,0.20)',
+           borderWidth:0, pointRadius:0, tension:0.15 };
+}
+function makeMarkerDataset(){
+  return { label:'t actual', data:[], showLine:false, borderColor:'rgba(0,0,0,0)',
+           pointRadius:5, pointHoverRadius:6 };
+}
+function ensureShadeAndMarkerDatasets(c){
+  const ds=c.data.datasets;
+  if(ds.length<2) ds[1]=makeShadeDataset();
+  if(ds.length<3) ds[2]=makeMarkerDataset();
+}
+function getChart(){
+  if(cone_chart) return cone_chart;
+  const ctx=$cone('chartH').getContext('2d');
+  cone_chart = new Chart(ctx,{
+    type:'line',
+    data:{labels:[],datasets:[{label:'h(t) [m]',data:[],tension:0.15}, makeShadeDataset(), makeMarkerDataset()]},
+    options:{responsive:true,animation:false,scales:{
+      x:{title:{display:true,text:'t [s]'}},
+      y:{title:{display:true,text:'h [m]'},beginAtZero:true}
+    }}
+  });
+  return cone_chart;
+}
+function updateShadingAtTime(t){
+  if(CONE_CURVE.T==null || !cone_chart) return;
+  ensureShadeAndMarkerDatasets(cone_chart);
+  const N = CONE_CURVE.labels.length-1;
+  const idx = Math.max(0, Math.min(N, Math.round((t/CONE_CURVE.T)*N)));
+  cone_chart.data.datasets[DS_SHADE].data = CONE_CURVE.data.map((v,i)=> i<=idx ? v : null);
+  cone_chart.data.datasets[DS_MARKER].data = CONE_CURVE.data.map((v,i)=> i===idx ? v : null);
+  cone_chart.update('none');
+}
+
+// ========== SVG del cono (dinámico) ==========
+const SVG_W=300, SVG_H=360;
+const BOT_Y=300, INNER_H_PX=220; // como antes
+const CX=150; // centro horizontal
+
+function R_of_h(h, m, R0,H,r){
+  if(m==='cone') return (R0/H)*h;
+  return r + (R0 - r)*(h/H);
+}
+function mapY(h, H){ // h en [0,H] → pixel Y (abajo=BOT_Y, arriba=BOT_Y-INNER_H_PX)
+  const frac = Math.max(0, Math.min(1, h/H));
+  return BOT_Y - frac*INNER_H_PX;
+}
+function scaleRX(Rm, Rmax){ // radio (m) → píxeles
+  const RX_MAX = 80; // ancho máximo permitido
+  const s = (Rmax>0)? (RX_MAX/Rmax) : 0;
+  return Rm*s;
+}
+function updateConeSVGAt(h, params){
+  const {model, R0,H,r} = params;
+  const Rmax = Math.max(R0, r||0.0001);
+  // radios superior/inferior del contorno
+  const rxTop = scaleRX(R0, Rmax);
+  const rxBot = scaleRX((model==='cone'?0:r), Rmax);
+
+  // y's fijos del contorno
+  const yTop = mapY(H, H);
+  const yBot = BOT_Y;
+
+  // dibuja contorno (trapecio/triángulo)
+  const outline = document.getElementById('coneOutline');
+  const pathD = [
+    `M ${CX-rxTop},${yTop}`,
+    `L ${CX-rxBot},${yBot}`,
+    `L ${CX+rxBot},${yBot}`,
+    `L ${CX+rxTop},${yTop}`,
+    'Z'
+  ].join(' ');
+  outline.setAttribute('d', pathD);
+  document.getElementById('coneClipPath').setAttribute('d', pathD);
+
+  // agua
+  const ySurf = mapY(h, H);
+  const waterRect = document.getElementById('waterRect');
+  waterRect.setAttribute('x', 0);
+  waterRect.setAttribute('y', ySurf);
+  waterRect.setAttribute('width', SVG_W);
+  waterRect.setAttribute('height', Math.max(0, yBot - ySurf));
+
+  // superficie (elipse) con rx según R(h)
+  const Rh = R_of_h(h, model, R0, H, r||0);
+  const rxh = scaleRX(Rh, Rmax);
+  const ryh = Math.max(6, rxh*0.3);
+  const waterTop = document.getElementById('waterTop');
+  waterTop.setAttribute('cx', CX);
+  waterTop.setAttribute('cy', ySurf);
+  waterTop.setAttribute('rx', rxh);
+  waterTop.setAttribute('ry', ryh);
+
+  // flecha h(t)
+  const up=document.getElementById('hArrowUp'), dn=document.getElementById('hArrowDown'), lbl=document.getElementById('hLabel');
+  up.setAttribute('x1', 270); up.setAttribute('x2', 270);
+  dn.setAttribute('x1', 270); dn.setAttribute('x2', 270);
+  up.setAttribute('y1', yBot); up.setAttribute('y2', ySurf+4);
+  dn.setAttribute('y1', ySurf+4); dn.setAttribute('y2', yBot);
+  lbl.setAttribute('x', 276); lbl.setAttribute('y', (ySurf+yBot)/2 - 6);
+}
+
+// ========== Cálculo + dibujo + gráfica ==========
+function calcAndPlot(){
+  const a=parseFloat($cone('aInput').value),
+        g=parseFloat($cone('gInput').value),
+        h0=parseFloat($cone('h0Input').value);
+  const m=modelSel.value;
+
+  let T=null, tvals=[], hvals=[];
+  let params={model:m, R0:null, H:null, r:null};
+
+  if(m==='cone'){
+    const R0=parseFloat($cone('R0Input').value), H=parseFloat($cone('HInput').value);
+    if(!(R0>0&&H>0&&a>0&&g>=0&&h0>=0)) return;
+    T=cone_T(R0,H,a,g,h0);
+    params.R0=R0; params.H=H; params.r=0;
+    const N=120;
+    for(let i=0;i<=N;i++){ const t=T*i/N; tvals.push(t); hvals.push(cone_h(t,R0,H,a,g,h0)); }
+  }else{ // trunc
+    const r=parseFloat($cone('rInput').value),
+          R0=parseFloat($cone('R0tInput').value),
+          H=parseFloat($cone('HtInput').value);
+    if(!(R0>r && H>0 && a>0 && g>=0 && h0>=0)) return;
+    T=trunc_T(R0,H,r,a,g,h0);
+    params.R0=R0; params.H=H; params.r=r;
+    const N=120;
+    for(let i=0;i<=N;i++){
+      const t=T*i/N;
+      tvals.push(t);
+      hvals.push(trunc_h_by_bisect(t,R0,H,r,a,g,h0));
+    }
+  }
+
+  // Mostrar T
+  $cone('Tval').textContent = (T && isFinite(T)) ? T.toFixed(4) : '—';
+
+  // Gráfico
+  const ch = getChart(); ensureShadeAndMarkerDatasets(ch);
+  ch.data.labels = tvals.map(v=>v.toFixed(2));
+  ch.data.datasets[DS_CURVE].data = hvals;
+  ch.update();
+
+  // Guardar curva y ajustar slider
+  CONE_CURVE.T = T; CONE_CURVE.labels = ch.data.labels; CONE_CURVE.data = hvals;
+  const tSlider=$cone('tRange');
+  tSlider.max = T.toFixed(6);
+  if(parseFloat(tSlider.value) > T) tSlider.value=T;
+
+  // Dibujar SVG al t actual
+  updateAtCurrentTime(params);
+}
+
+function updateAtCurrentTime(params){
+  const t=parseFloat($cone('tRange').value)||0;
+  const m=modelSel.value;
+  const a=parseFloat($cone('aInput').value),
+        g=parseFloat($cone('gInput').value),
+        h0=parseFloat($cone('h0Input').value);
+  let h=0;
+
+  if(m==='cone'){
+    const R0=parseFloat($cone('R0Input').value), H=parseFloat($cone('HInput').value);
+    h = cone_h(Math.min(t, CONE_CURVE.T||t), R0,H,a,g,h0);
+    updateConeSVGAt(h, {model:m, R0, H, r:0});
+  }else{
+    const r=parseFloat($cone('rInput').value),
+          R0=parseFloat($cone('R0tInput').value),
+          H=parseFloat($cone('HtInput').value);
+    h = trunc_h_by_bisect(Math.min(t, CONE_CURVE.T||t), R0,H,r,a,g,h0);
+    updateConeSVGAt(h, {model:m, R0, H, r});
+  }
+
+  // UI: t y h(t)
+  $cone('tVal').textContent = (t||0).toFixed(2);
+  $cone('hVal').textContent = isFinite(h)? h.toFixed(4) : '—';
+
+  // sombreado y marcador en la curva
+  updateShadingAtTime(Math.min(t, CONE_CURVE.T||t));
+}
+
+// Eventos
+$cone('btnCalc').addEventListener('click', e=>{ e.preventDefault(); calcAndPlot(); });
+['aInput','gInput','h0Input','R0Input','HInput','rInput','R0tInput','HtInput'].forEach(id=>{
+  const el=$cone(id); if(el) el.addEventListener('input', calcAndPlot);
+});
+$cone('tRange').addEventListener('input', ()=> updateAtCurrentTime({}));
+
+modelSel.addEventListener('change', ()=>{
+  updateParamVisibility();
+  calcAndPlot();
+});
+
+// Init
+window.addEventListener('load', ()=>{
+  updateParamVisibility();
+  setAhBox();
+  updateIntegrationContent();
+  calcAndPlot();
+});
+</script>
+{% endblock %}
