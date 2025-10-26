@@ -17,44 +17,29 @@
     border-radius:8px; padding:2px 8px; font-size:.8rem;
   }
 
-  /* ===== MEJORAS PARA FÓRMULAS EN MÓVILES ===== */
-  .formula-container {
+  /* ===== MEJORAS ESPECÍFICAS PARA FÓRMULAS LARGAS ===== */
+  .formula-scrollable {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
     max-width: 100%;
-    padding: 0.5rem 0;
+    padding: 0.75rem 0;
     margin: 0.5rem 0;
-  }
-
-  .formula-main {
-    font-size: 1.1rem;
     text-align: center;
-    min-width: min-content;
-    display: inline-block;
-    padding: 0 0.5rem;
-  }
-
-  .formula-boxed {
-    font-size: 1.1rem;
-    text-align: center;
-    min-width: min-content;
-    display: inline-block;
-    padding: 0.5rem;
+    border: 1px solid #e9ecef;
+    border-radius: 6px;
     background: #f8f9fa;
-    border: 1px solid #dee2e6;
-    border-radius: 4px;
-    margin: 0.25rem 0;
+  }
+
+  .formula-scrollable mjx-container {
+    min-width: min-content;
+    display: inline-block !important;
+    padding: 0 1rem;
   }
 
   /* Ajustes específicos para móviles */
   @media (max-width: 768px) {
-    .formula-main {
-      font-size: 1rem;
-    }
-    
-    .formula-boxed {
-      font-size: 1rem;
-      padding: 0.4rem;
+    .formula-scrollable {
+      padding: 0.5rem 0;
     }
     
     .card-title {
@@ -64,20 +49,15 @@
     h6 {
       font-size: 0.95rem;
     }
-    
-    .fs-5 {
-      font-size: 1rem !important;
-    }
   }
 
   @media (max-width: 576px) {
-    .formula-main {
-      font-size: 0.9rem;
+    .formula-scrollable {
+      padding: 0.4rem 0;
     }
     
-    .formula-boxed {
-      font-size: 0.9rem;
-      padding: 0.3rem;
+    .formula-scrollable mjx-container {
+      padding: 0 0.5rem;
     }
     
     .tank-wrap {
@@ -107,10 +87,8 @@
         <p>
           Pasamos todo lo que depende de \(h\) a la izquierda y \(t\) a la derecha:
         </p>
-        <div class="formula-container">
-          <div class="formula-main">
-            \( \dfrac{dh}{\sqrt{h}} \;=\; -\,\dfrac{a}{A}\,\sqrt{2g}\;dt \)
-          </div>
+        <div class="formula-scrollable">
+          \( \dfrac{dh}{\sqrt{h}} \;=\; -\,\dfrac{a}{A}\,\sqrt{2g}\;dt \)
         </div>
 
         <!-- Paso 2: integrar con condiciones -->
@@ -118,29 +96,21 @@
         <p>
           Integramos desde \(t=0\) hasta \(t\) y desde \(h_0\) hasta \(h(t)\):
         </p>
-        <div class="formula-container">
-          <div class="formula-main">
-            \( \int_{h_0}^{h(t)} \! \frac{dh}{\sqrt{h}} \;=\; -\,\frac{a}{A}\,\sqrt{2g}\;\int_{0}^{t}\! dt \)
-          </div>
+        <div class="formula-scrollable">
+          \( \int_{h_0}^{h(t)} \! \frac{dh}{\sqrt{h}} \;=\; -\,\frac{a}{A}\,\sqrt{2g}\;\int_{0}^{t}\! dt \)
         </div>
-        <div class="formula-container">
-          <div class="formula-main">
-            \( 2\big(\sqrt{h(t)}-\sqrt{h_0}\big) \;=\; -\,\frac{a}{A}\,\sqrt{2g}\;t \)
-          </div>
+        <div class="formula-scrollable">
+          \( 2\big(\sqrt{h(t)}-\sqrt{h_0}\big) \;=\; -\,\frac{a}{A}\,\sqrt{2g}\;t \)
         </div>
 
         <!-- Paso 3: despejar h(t) -->
         <h6 class="mb-2">Paso 3. Despejamos \(h(t)\)</h6>
-        <div class="formula-container">
-          <div class="formula-main">
-            \( \sqrt{h(t)} \;=\; \sqrt{h_0} \;-\; \frac{a}{2A}\,\sqrt{2g}\;t \)
-          </div>
+        <div class="formula-scrollable">
+          \( \sqrt{h(t)} \;=\; \sqrt{h_0} \;-\; \frac{a}{2A}\,\sqrt{2g}\;t \)
         </div>
         
-        <div class="formula-container">
-          <div class="formula-boxed">
-            \( h(t) \;=\; \Big(\sqrt{h_0} - \dfrac{a}{2A}\sqrt{2g}\;t\Big)^2 \)
-          </div>
+        <div class="formula-scrollable" style="background: #e7f3ff; border-color: #b6d4fe;">
+          \( h(t) \;=\; \left(\sqrt{h_0} - \dfrac{a}{2A}\sqrt{2g}\;t\right)^2 \)
         </div>
         <div class="text-center small text-muted mb-3">
           (mientras \(h \ge 0\))
@@ -152,10 +122,8 @@
           El vaciado ocurre cuando \(h(T)=0\), es decir \(\sqrt{h_0} - \dfrac{a}{2A}\sqrt{2g}\,T=0\).
           Por tanto:
         </p>
-        <div class="formula-container">
-          <div class="formula-boxed">
-            \( T \;=\; \frac{2A}{a}\,\frac{\sqrt{h_0}}{\sqrt{2g}} \;=\; \frac{A}{a}\,\sqrt{\frac{2h_0}{g}} \)
-          </div>
+        <div class="formula-scrollable" style="background: #e7f3ff; border-color: #b6d4fe;">
+          \( T \;=\; \dfrac{2A}{a}\cdot\dfrac{\sqrt{h_0}}{\sqrt{2g}} \;=\; \dfrac{A}{a}\sqrt{\dfrac{2h_0}{g}} \)
         </div>
 
         <div class="alert alert-secondary mt-3">
