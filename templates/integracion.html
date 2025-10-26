@@ -1,4 +1,4 @@
-    {% extends "base.html" %}
+{% extends "base.html" %}
 {% block title %}Integración — h(t) y tiempo de vaciado{% endblock %}
 {% block head %}
   <!-- Chart.js para el gráfico -->
@@ -16,9 +16,84 @@
     background:#eef2ff; color:#1e2a78; border:1px solid #c7d2fe;
     border-radius:8px; padding:2px 8px; font-size:.8rem;
   }
-</style>
 
+  /* ===== MEJORAS PARA FÓRMULAS EN MÓVILES ===== */
+  .formula-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    max-width: 100%;
+    padding: 0.5rem 0;
+    margin: 0.5rem 0;
+  }
+
+  .formula-main {
+    font-size: 1.1rem;
+    text-align: center;
+    min-width: min-content;
+    display: inline-block;
+    padding: 0 0.5rem;
+  }
+
+  .formula-boxed {
+    font-size: 1.1rem;
+    text-align: center;
+    min-width: min-content;
+    display: inline-block;
+    padding: 0.5rem;
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    margin: 0.25rem 0;
+  }
+
+  /* Ajustes específicos para móviles */
+  @media (max-width: 768px) {
+    .formula-main {
+      font-size: 1rem;
+    }
+    
+    .formula-boxed {
+      font-size: 1rem;
+      padding: 0.4rem;
+    }
+    
+    .card-title {
+      font-size: 1.1rem;
+    }
+    
+    h6 {
+      font-size: 0.95rem;
+    }
+    
+    .fs-5 {
+      font-size: 1rem !important;
+    }
+  }
+
+  @media (max-width: 576px) {
+    .formula-main {
+      font-size: 0.9rem;
+    }
+    
+    .formula-boxed {
+      font-size: 0.9rem;
+      padding: 0.3rem;
+    }
+    
+    .tank-wrap {
+      flex-direction: column;
+      align-items: center;
+    }
+    
+    .tank-rail {
+      height: 20px;
+      width: 80%;
+      margin-top: 0;
+    }
+  }
+  </style>
 {% endblock %}
+
 {% block content %}
 
 <div class="row g-4">
@@ -32,43 +107,44 @@
         <p>
           Pasamos todo lo que depende de \(h\) a la izquierda y \(t\) a la derecha:
         </p>
-        <p class="fs-5 text-center mb-2">
-          \(
-          \dfrac{dh}{\sqrt{h}} \;=\; -\,\dfrac{a}{A}\,\sqrt{2g}\;dt.
-          \)
-        </p>
+        <div class="formula-container">
+          <div class="formula-main">
+            \( \dfrac{dh}{\sqrt{h}} \;=\; -\,\dfrac{a}{A}\,\sqrt{2g}\;dt \)
+          </div>
+        </div>
 
         <!-- Paso 2: integrar con condiciones -->
         <h6 class="mb-2">Paso 2. Integramos con \(h(0)=h_0\)</h6>
         <p>
           Integramos desde \(t=0\) hasta \(t\) y desde \(h_0\) hasta \(h(t)\):
         </p>
-        <p class="fs-5 text-center">
-          \(
-          \int_{h_0}^{h(t)} \! \frac{dh}{\sqrt{h}}
-          \;=\;
-          -\,\frac{a}{A}\,\sqrt{2g}\;\int_{0}^{t}\! dt.
-          \)
-        </p>
-        <p class="fs-5 text-center mb-2">
-          \(
-          2\big(\sqrt{h(t)}-\sqrt{h_0}\big) \;=\; -\,\frac{a}{A}\,\sqrt{2g}\;t.
-          \)
-        </p>
+        <div class="formula-container">
+          <div class="formula-main">
+            \( \int_{h_0}^{h(t)} \! \frac{dh}{\sqrt{h}} \;=\; -\,\frac{a}{A}\,\sqrt{2g}\;\int_{0}^{t}\! dt \)
+          </div>
+        </div>
+        <div class="formula-container">
+          <div class="formula-main">
+            \( 2\big(\sqrt{h(t)}-\sqrt{h_0}\big) \;=\; -\,\frac{a}{A}\,\sqrt{2g}\;t \)
+          </div>
+        </div>
 
         <!-- Paso 3: despejar h(t) -->
         <h6 class="mb-2">Paso 3. Despejamos \(h(t)\)</h6>
-        <p class="fs-5 text-center mb-2">
-          \(
-          \sqrt{h(t)} \;=\; \sqrt{h_0} \;-\; \frac{a}{2A}\,\sqrt{2g}\;t
-          \)
-        </p>
-<div class="fs-5 text-center mb-3 math-inline-wrap">
-  \(
-    \boxed{\,h(t) \;=\; \Big(\sqrt{h_0} - \dfrac{a}{2A}\sqrt{2g}\;t\Big)^2\,}
-    \quad \text{(mientras \(h\ge 0\)).}
-  \)
-</div>
+        <div class="formula-container">
+          <div class="formula-main">
+            \( \sqrt{h(t)} \;=\; \sqrt{h_0} \;-\; \frac{a}{2A}\,\sqrt{2g}\;t \)
+          </div>
+        </div>
+        
+        <div class="formula-container">
+          <div class="formula-boxed">
+            \( h(t) \;=\; \Big(\sqrt{h_0} - \dfrac{a}{2A}\sqrt{2g}\;t\Big)^2 \)
+          </div>
+        </div>
+        <div class="text-center small text-muted mb-3">
+          (mientras \(h \ge 0\))
+        </div>
 
         <!-- Paso 4: tiempo total de vaciado -->
         <h6 class="mb-2">Paso 4. Tiempo total de vaciado \(T\)</h6>
@@ -76,18 +152,16 @@
           El vaciado ocurre cuando \(h(T)=0\), es decir \(\sqrt{h_0} - \dfrac{a}{2A}\sqrt{2g}\,T=0\).
           Por tanto:
         </p>
-        <p class="fs-5 text-center">
-          \(
-          \boxed{\,T \;=\; \frac{2A}{a}\,\frac{\sqrt{h_0}}{\sqrt{2g}}
-          \;=\; \frac{A}{a}\,\sqrt{\frac{2h_0}{g}}\,}
-          \)
-        </p>
+        <div class="formula-container">
+          <div class="formula-boxed">
+            \( T \;=\; \frac{2A}{a}\,\frac{\sqrt{h_0}}{\sqrt{2g}} \;=\; \frac{A}{a}\,\sqrt{\frac{2h_0}{g}} \)
+          </div>
+        </div>
 
         <div class="alert alert-secondary mt-3">
           <strong>Lectura física:</strong> \(T\) crece linealmente con \(A/a\) (tanque más ancho u orificio más chico)
           y con \(\sqrt{h_0}\). Disminuye si \(g\) es mayor.
         </div>
-
       </div>
     </div>
   </div>
@@ -123,88 +197,88 @@
         </form>
 
         <div class="card shadow-sm mt-3 tank-card">
-  <div class="card-body">
-    <h5 class="card-title mb-3">Diagrama del tanque (dinámico)</h5>
+          <div class="card-body">
+            <h5 class="card-title mb-3">Diagrama del tanque (dinámico)</h5>
 
-    <!-- Control de tiempo para ver la altura h(t) en el dibujo -->
-    <div class="row g-2 align-items-center mb-2">
-      <div class="col-sm-8">
-        <label class="form-label mb-0">Tiempo t [s] (para vista del diagrama)</label>
-        <input type="range" class="form-range" min="0" max="1" step="0.01" id="tRange" value="0">
-      </div>
-      <div class="col-sm-4 text-sm-end">
-        <span class="badge-soft">t = <span id="tVal" class="mathmono">0.00</span> s</span>
-        <span class="badge-soft ms-2">h(t) = <span id="hVal" class="mathmono">—</span> m</span>
-      </div>
-    </div>
+            <!-- Control de tiempo para ver la altura h(t) en el dibujo -->
+            <div class="row g-2 align-items-center mb-2">
+              <div class="col-sm-8">
+                <label class="form-label mb-0">Tiempo t [s] (para vista del diagrama)</label>
+                <input type="range" class="form-range" min="0" max="1" step="0.01" id="tRange" value="0">
+              </div>
+              <div class="col-sm-4 text-sm-end">
+                <span class="badge-soft">t = <span id="tVal" class="mathmono">0.00</span> s</span>
+                <span class="badge-soft ms-2">h(t) = <span id="hVal" class="mathmono">—</span> m</span>
+              </div>
+            </div>
 
-    <div class="tank-wrap">
-      <!-- SVG del tanque -->
-      <svg id="tankSvg" viewBox="0 0 300 360" width="300" height="360" aria-label="Tanque cilíndrico">
-        <!-- Parámetros de geometría en pixeles -->
-        <!-- Top ellipse center (150,60), bottom ellipse center (150,300) -->
-        <!-- Altura interna efectiva  = 220 px (de 80 a 300) -->
-        <!-- Paredes -->
-        <defs>
-          <clipPath id="tankClip">
-            <!-- Silueta interior para recortar el agua -->
-            <path d="
-              M 70,60
-              C 70,46 102,36 150,36
-              C 198,36 230,46 230,60
-              L 230,300
-              C 230,314 198,324 150,324
-              C 102,324 70,314 70,300
-              Z" />
-          </clipPath>
-        </defs>
+            <div class="tank-wrap">
+              <!-- SVG del tanque -->
+              <svg id="tankSvg" viewBox="0 0 300 360" width="300" height="360" aria-label="Tanque cilíndrico">
+                <!-- Parámetros de geometría en pixeles -->
+                <!-- Top ellipse center (150,60), bottom ellipse center (150,300) -->
+                <!-- Altura interna efectiva  = 220 px (de 80 a 300) -->
+                <!-- Paredes -->
+                <defs>
+                  <clipPath id="tankClip">
+                    <!-- Silueta interior para recortar el agua -->
+                    <path d="
+                      M 70,60
+                      C 70,46 102,36 150,36
+                      C 198,36 230,46 230,60
+                      L 230,300
+                      C 230,314 198,324 150,324
+                      C 102,324 70,314 70,300
+                      Z" />
+                  </clipPath>
+                </defs>
 
-        <!-- Contorno del tanque -->
-        <!-- Tapa superior (elipse) -->
-        <ellipse cx="150" cy="60" rx="80" ry="24" fill="none" stroke="#222" stroke-width="2"/>
-        <!-- Paredes -->
-        <line x1="70" y1="60" x2="70" y2="300" stroke="#222" stroke-width="2"/>
-        <line x1="230" y1="60" x2="230" y2="300" stroke="#222" stroke-width="2"/>
-        <!-- Base (elipse) -->
-        <ellipse cx="150" cy="300" rx="80" ry="24" fill="none" stroke="#222" stroke-width="2"/>
+                <!-- Contorno del tanque -->
+                <!-- Tapa superior (elipse) -->
+                <ellipse cx="150" cy="60" rx="80" ry="24" fill="none" stroke="#222" stroke-width="2"/>
+                <!-- Paredes -->
+                <line x1="70" y1="60" x2="70" y2="300" stroke="#222" stroke-width="2"/>
+                <line x1="230" y1="60" x2="230" y2="300" stroke="#222" stroke-width="2"/>
+                <!-- Base (elipse) -->
+                <ellipse cx="150" cy="300" rx="80" ry="24" fill="none" stroke="#222" stroke-width="2"/>
 
-        <!-- AGUA (recortada por el tanque) -->
-        <g clip-path="url(#tankClip)" id="waterGroup">
-          <!-- cuerpo de agua -->
-          <rect id="waterRect" x="70" y="300" width="160" height="0" fill="#6ec1ff" opacity="0.75"/>
-          <!-- superficie (elipse) -->
-          <ellipse id="waterTop" cx="150" cy="300" rx="80" ry="24" fill="#bfe7ff" opacity="0.85" />
-        </g>
+                <!-- AGUA (recortada por el tanque) -->
+                <g clip-path="url(#tankClip)" id="waterGroup">
+                  <!-- cuerpo de agua -->
+                  <rect id="waterRect" x="70" y="300" width="160" height="0" fill="#6ec1ff" opacity="0.75"/>
+                  <!-- superficie (elipse) -->
+                  <ellipse id="waterTop" cx="150" cy="300" rx="80" ry="24" fill="#bfe7ff" opacity="0.85" />
+                </g>
 
-        <!-- Flecha de altura h(t) -->
-        <line id="hArrowUp"   x1="260" y1="300" x2="260" y2="300" stroke="#222" stroke-width="2" marker-end="url(#arrow)"/>
-        <line id="hArrowDown" x1="260" y1="300" x2="260" y2="300" stroke="#222" stroke-width="2" marker-end="url(#arrow)"/>
-        <text id="hLabel" x="266" y="190" font-size="12" fill="#222">h(t)</text>
+                <!-- Flecha de altura h(t) -->
+                <line id="hArrowUp"   x1="260" y1="300" x2="260" y2="300" stroke="#222" stroke-width="2" marker-end="url(#arrow)"/>
+                <line id="hArrowDown" x1="260" y1="300" x2="260" y2="300" stroke="#222" stroke-width="2" marker-end="url(#arrow)"/>
+                <text id="hLabel" x="266" y="190" font-size="12" fill="#222">h(t)</text>
 
-        <!-- Marcas y textos A, a -->
-        <text id="Atext"  x="20"  y="24"  font-size="13" class="mathmono">A = πR² = — m²</text>
-        <text id="atext"  x="20"  y="42"  font-size="13" class="mathmono">a = πr² = — m²</text>
-        <text id="Rtext"  x="200" y="24"  font-size="12" class="mathmono">R = — m</text>
-        <text id="rtext"  x="200" y="42"  font-size="12" class="mathmono">r = — m</text>
+                <!-- Marcas y textos A, a -->
+                <text id="Atext"  x="20"  y="24"  font-size="13" class="mathmono">A = πR² = — m²</text>
+                <text id="atext"  x="20"  y="42"  font-size="13" class="mathmono">a = πr² = — m²</text>
+                <text id="Rtext"  x="200" y="24"  font-size="12" class="mathmono">R = — m</text>
+                <text id="rtext"  x="200" y="42"  font-size="12" class="mathmono">r = — m</text>
 
-        <!-- Definición de flecha -->
-        <defs>
-          <marker id="arrow" markerWidth="10" markerHeight="10" refX="6" refY="3" orient="auto" markerUnits="strokeWidth">
-            <path d="M0,0 L0,6 L6,3 z" fill="#222" />
-          </marker>
-        </defs>
-      </svg>
+                <!-- Definición de flecha -->
+                <defs>
+                  <marker id="arrow" markerWidth="10" markerHeight="10" refX="6" refY="3" orient="auto" markerUnits="strokeWidth">
+                    <path d="M0,0 L0,6 L6,3 z" fill="#222" />
+                  </marker>
+                </defs>
+              </svg>
 
-      <!-- Regla amarilla a la derecha (estética como tu imagen) -->
-      <div class="tank-rail d-none d-md-block"></div>
-    </div>
+              <!-- Regla amarilla a la derecha (estética como tu imagen) -->
+              <div class="tank-rail d-none d-md-block"></div>
+            </div>
 
-    <div class="tank-legend mt-3">
-      <small class="text-muted">El agua (azul) se dibuja con \(h(t)\) calculada a partir de tus parámetros.
-      El control de tiempo ajusta solo la **vista** del diagrama (no cambia la gráfica).</small>
-    </div>
-  </div>
-</div>
+            <div class="tank-legend mt-3">
+              <small class="text-muted">El agua (azul) se dibuja con \(h(t)\) calculada a partir de tus parámetros.
+              El control de tiempo ajusta solo la **vista** del diagrama (no cambia la gráfica).</small>
+            </div>
+          </div>
+        </div>
 
         <hr>
         <div id="resultadoT">
@@ -480,6 +554,4 @@ window.addEventListener('load', () => {
   updateDiagram();      // diagrama
 });
 </script>
-
-
 {% endblock %}
