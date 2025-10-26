@@ -1,0 +1,444 @@
+{% extends "base.html" %}
+{% block title %}Barrido del área de salida — Cono Truncado (versión clase){% endblock %}
+
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+<style>
+  .code-wrap{background:#0b1020;color:#e5e7eb;border-radius:10px;padding:1rem 1.25rem;border:1px solid #111827;overflow-x:auto;font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;line-height:1.45;position:relative}
+  .tt{cursor:help;text-decoration:underline dotted;border-bottom:1px dotted #60a5fa;color:#93c5fd}
+  .tt:hover{color:#bfdbfe}
+  .param-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+  .param-grid .full{grid-column:1/-1}
+  .copy-btn{position:absolute;top:8px;right:8px;font-size:.85rem;background:#111827;color:#e5e7eb;border:1px solid #374151;border-radius:6px;padding:.25rem .5rem}
+  .legend-pill{display:inline-flex;align-items:center;gap:.4rem;padding:.25rem .5rem;border-radius:9999px;border:1px solid #e5e7eb;background:#f8fafc;font-size:.85rem}
+  .dot{width:.7rem;height:.7rem;border-radius:50%;display:inline-block}
+  .table-sm td,.table-sm th{padding:.35rem .5rem}
+  .swatch{width:10px;height:10px;border-radius:2px;display:inline-block;margin-right:.4rem}
+  .geometry-badge {background:#e0f2fe;color:#0369a1;border:1px solid#bae6fd;border-radius:6px;padding:4px 8px;font-size:0.8rem;}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  // ---------- Tooltips + LaTeX ----------
+  const initTooltips = () => {
+    document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el=>{
+      new bootstrap.Tooltip(el,{html:true,trigger:'hover focus',sanitize:false,container:'body',delay:{show:250,hide:100}});
+      el.addEventListener('shown.bs.tooltip',()=>{
+        const id=el.getAttribute('aria-describedby'); const tip=id&&document.getElementById(id);
+        if(tip && window.MathJax?.typesetPromise){ const inner=tip.querySelector('.tooltip-inner'); if(inner) MathJax.typesetPromise([inner]).catch(()=>{}); }
+      });
+    });
+  };
+
+  // ---------- Inputs ----------
+  const rEl  = document.getElementById('paramr');
+  const R0El = document.getElementById('paramR0');
+  const HEl  = document.getElementById('paramH');
+  const gEl  = document.getElementById('paramg');
+  const h0El = document.getElementById('paramh0');
+  const pasoEl = document.getElementById('paramPaso');
+  const k0El   = document.getElementById('paramK0');
+  const dKEl   = document.getElementById('paramdK');
+  const nEl    = document.getElementById('paramNcurves');
+  const tvacTblBody = document.getElementById('tbodyCurves');
+
+  // ---------- Función A(h) para cono truncado ----------
+  function A_h_cono_truncado(h, r, R0, H) {
+    const alpha = (R0 - r) / H;
+    const R_h = r + alpha * h;
+    return Math.PI * R_h * R_h;
+  }
+
+  // ---------- Integrando dt/dh para cono truncado ----------
+  function integrand_cono_truncado(h, r, R0, H, a, g){
+    if(h <= 0) return 0;
+    const A_h = A_h_cono_truncado(h, r, R0, H);
+    return A_h / (a * Math.sqrt(2 * g * h));
+  }
+
+  // ---------- Integración numérica (simula integrate.quad) ----------
+  function quadSimpson(f, a, b, tol=1e-8, maxDepth=12){
+    const sgn = b>=a ? 1 : -1;
+    const A = Math.min(a,b), B = Math.max(a,b);
+    function S(f, x0, x2){ const x1=0.5*(x0+x2); return (x2-x0)*(f(x0)+4*f(x1)+f(x2))/6; }
+    function adapt(f, x0, x2, S0, depth){
+      const x1=0.5*(x0+x2), Sleft=S(f,x0,x1), Sright=S(f,x1,x2);
+      const err = Math.abs(Sleft+Sright - S0);
+      if(err < 15*tol || depth<=0) return Sleft+Sright + (Sleft+Sright - S0)/15;
+      return adapt(f,x0,x1,Sleft,depth-1) + adapt(f,x1,x2,Sright,depth-1);
+    }
+    const S0=S(f,A,B);
+    return sgn*adapt(f,A,B,S0,maxDepth);
+  }
+
+  // ---------- Método numérico (estilo clase) ----------
+function serieNumericaConoTruncado(h0, paso, r, R0, H, a, g){
+    const N = Math.max(1, Math.floor(h0/Math.max(paso,1e-12)));
+    const t_num=[], y_num=[];
+    let y=Math.max(0,h0);
+    
+    for(let i=1;i<=N;i++){
+ const value = quadSimpson(h=>integrand_cono_truncado(h, r, R0, H, a, g), y, h0);
+        t_num.push(value);
+        y_num.push(y);
+        y = Math.max(0, y - paso);
+    }
+    
+    return {t:t_num, y:y_num};
+  }
+
+  // ---------- Gráfico ----------
+  const ctx=document.getElementById('chart').getContext('2d');
+  let chart;
+
+  function randomColor(i){
+    const cols=['#2563eb','#10b981','#f59e0b','#ef4444','#8b5cf6','#06b6d4','#84cc16','#f97316','#e11d48','#22c55e'];
+    return cols[i % cols.length];
+  }
+
+function estimateTvacNum(series){
+    let tVac = series.t[series.t.length-1];
+    if(series.y.length>=2){
+        const h1=series.y[series.y.length-2], h2=series.y[series.y.length-1];
+        const t1=series.t[series.t.length-2], t2=series.t[series.t.length-1];
+        if(h1>0 && h2>=0 && h1!==h2){
+            const frac = h1/(h1-h2);
+            tVac = t1 + frac*(t2-t1);
+        }
+    }
+    return Math.abs(tVac); // Asegurar que sea positivo
+}
+
+  function update(){
+    const r = Math.max(1e-12, parseFloat(rEl.value));
+    const R0 = Math.max(r + 1e-12, parseFloat(R0El.value));
+    const H = Math.max(1e-12, parseFloat(HEl.value));
+    const g = Math.max(1e-12, parseFloat(gEl.value));
+    const h0 = Math.max(0, parseFloat(h0El.value));
+    const paso = Math.max(1e-6, Math.min(parseFloat(pasoEl.value), h0));
+    let k = Math.max(0, parseFloat(k0El.value));
+    const dk = Math.max(0, parseFloat(dKEl.value));
+    const nCurves = Math.max(1, parseInt(nEl.value || '1', 10));
+
+    const datasets = [];
+    const rows = [];
+
+    for(let i=0;i<nCurves;i++){
+      const a = k;  // En cono truncado, a es el área absoluta del orificio
+      const serie = serieNumericaConoTruncado(h0, paso, r, R0, H, a, g);
+      const color = randomColor(i);
+      
+      datasets.push({
+        label: `a = ${a.toExponential(4)} m²`,
+        data: serie.t.map((ti,idx)=>({x:ti, y:serie.y[idx]})),
+        parsing:false,
+        borderColor: color,
+        backgroundColor: color,
+        borderWidth: 2,
+        fill:false,
+        pointRadius: 0,
+        tension: 0.08
+      });
+
+      const tVac = estimateTvacNum(serie);
+      rows.push({i:i+1, a, tVac, color});
+      k += dk;
+    }
+
+    // tabla
+    tvacTblBody.innerHTML='';
+    rows.forEach(r=>{
+      const tr=document.createElement('tr');
+      tr.innerHTML = `
+        <td class="text-muted">${r.i}</td>
+        <td><span class="swatch" style="background:${r.color}"></span>a = ${r.a.toExponential(4)} m²</td>
+        <td>${r.tVac.toFixed(4)} s</td>
+        <td>${(r.a / (Math.PI * r * r)).toExponential(4)}</td>
+      `;
+      tvacTblBody.appendChild(tr);
+    });
+
+    if(!chart){
+      chart = new Chart(ctx,{
+        type:'line',
+        data:{datasets},
+        options:{
+          parsing:false, animation:{duration:0}, responsive:true,
+          interaction:{intersect:false,mode:'nearest'},
+          scales:{
+            x:{type:'linear', title:{display:true,text:'t (s)'}},
+            y:{title:{display:true,text:'h (m)'}, suggestedMin:0, suggestedMax:Math.max(1,h0)}
+          },
+          plugins:{legend:{display:true, position:'bottom'}}
+        }
+      });
+    }else{
+      chart.data.datasets = datasets;
+      chart.options.scales.y.suggestedMax = Math.max(1,h0);
+      chart.update();
+    }
+
+    // refresca snippet
+    renderCode(r, R0, H, g, h0, paso, parseFloat(k0El.value), dk, nCurves);
+  }
+
+  // ---------- Código EXACTO de clase (barrido para cono truncado) ----------
+  const codeEl=document.getElementById('code-block');
+  function renderCode(r, R0, H, g, h0, paso, k0, dk, nCurves){
+    const codeHtml = `
+<span class="tt" data-bs-toggle="tooltip" data-bs-title="Mismo enfoque de clase aplicado al cono truncado">
+import numpy as <b>np</b>
+import matplotlib.pyplot as <b>plt</b>
+from scipy import <b>integrate</b></span>
+
+<span class="tt" data-bs-toggle="tooltip" data-bs-title="Geometría del cono truncado: radio inferior r, superior R₀, altura H">
+# Parámetros del cono truncado
+r = <b>${r.toFixed(4)}</b>   # m - radio del cuello
+R0 = <b>${R0.toFixed(4)}</b>  # m - radio de la boca
+H = <b>${H.toFixed(4)}</b>   # m - altura total</span>
+
+<span class="tt" data-bs-toggle="tooltip" data-bs-title="Función A(h) para cono truncado - área transversal variable">
+def A_h(h):
+    alpha = (R0 - r) / H
+    R_h = r + alpha * h
+    return np.pi * R_h**2</span>
+
+<span class="tt" data-bs-toggle="tooltip" data-bs-title="Método numérico idéntico al de clase, adaptado al cono truncado">
+def h_num_cono_truncado(h_0, paso, r, R0, H, a, g):
+    aux = int(h_0 / paso)
+    t_num = []
+    y_num = []
+    error_num = []
+    y = h_0</span>
+    
+    <span class="tt" data-bs-toggle="tooltip" data-bs-title="Bucle idéntico al de clase - malla descendente en altura">
+    for i in range(1, aux + 1):
+        <span class="tt" data-bs-toggle="tooltip" data-bs-title="Integración con quad - dt/dh para cono truncado">
+        value, error = integrate.quad(
+            lambda h: A_h(h) / (a * np.sqrt(2 * g * h)), 
+            y, h_0
+        )</span>
+        
+        y_num.append(y)
+        t_num.append(value)
+        error_num.append(error)
+        y = y - paso
+        if y <= 0:
+            break
+    
+    return t_num, y_num, error_num</span>
+
+<span class="tt" data-bs-toggle="tooltip" data-bs-title="Barrido del área de salida - variamos a sistemáticamente">
+# Barrido del área de salida
+k = <b>${k0.toFixed(6)}</b>  # área inicial del orificio
+for i in range(<b>${nCurves}</b>):
+    <span class="tt" data-bs-toggle="tooltip" data-bs-title="Para cada área a, calculamos la curva numérica">
+    t_num, y_num, error = h_num_cono_truncado(
+        <b>${h0.toFixed(2)}</b>, <b>${paso.toFixed(4)}</b>, 
+        r, R0, H, k, <b>${g.toFixed(1)}</b>
+    )</span>
+    
+    <span class="tt" data-bs-toggle="tooltip" data-bs-title="Graficamos cada curva - estilo idéntico al de clase">
+    plt.plot(t_num, y_num, label=f'a = {k:.2e} m²')</span>
+    
+    <span class="tt" data-bs-toggle="tooltip" data-bs-title="Incrementamos el área para la siguiente curva">
+    k += <b>${dk.toFixed(6)}</b></span>
+
+<span class="tt" data-bs-toggle="tooltip" data-bs-title="Configuración del gráfico como en clase">
+plt.xlabel('Tiempo t (s)')
+plt.ylabel('Altura h (m)')
+plt.title('Cono Truncado - Barrido del área de salida')
+plt.legend()
+plt.grid(True, alpha=0.3)
+plt.ylim(0, <b>${h0.toFixed(1)}</b>)
+plt.tight_layout()
+plt.show()</span>`;
+    codeEl.textContent=''; codeEl.innerHTML=codeHtml;
+    setTimeout(()=>{ initTooltips(); window.MathJax?.typesetPromise?.([codeEl]).catch(()=>{}); },100);
+  }
+
+  // ---------- Eventos ----------
+  document.getElementById('copy').addEventListener('click',()=>{
+    const tmp=document.createElement('textarea'); tmp.value=codeEl.innerText;
+    document.body.appendChild(tmp); tmp.select(); document.execCommand('copy'); document.body.removeChild(tmp);
+    const btn=document.getElementById('copy'); btn.textContent='¡Copiado!'; setTimeout(()=>btn.textContent='Copiar código',1200);
+  });
+
+  document.getElementById('reset').addEventListener('click',()=>{
+    rEl.value=0.1; R0El.value=0.4; HEl.value=1.0; gEl.value=9.8; h0El.value=1.0; pasoEl.value=0.05;
+    k0El.value=0.0001; dKEl.value=0.00005; nEl.value=8;
+    update();
+  });
+
+  [rEl, R0El, HEl, gEl, h0El, pasoEl, k0El, dKEl, nEl].forEach(el=>{
+    el.addEventListener('input',update);
+    el.addEventListener('change',update);
+  });
+
+  const modal=document.getElementById('explicacionModal');
+  modal?.addEventListener('shown.bs.modal',()=>{ window.MathJax?.typesetPromise?.([modal]).catch(()=>{}); });
+
+  // init
+  initTooltips();
+  document.getElementById('reset').click();
+});
+</script>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+  <h1 class="h3 mb-2">Barrido del área de salida — Cono Truncado</h1>
+  <p class="text-muted mb-3">
+    Aplicamos el método numérico de clase al cono truncado, barriendo diferentes áreas de salida \(a\) 
+    y observando cómo cambia la curva \(h(t)\) y el tiempo de vaciado.
+    <span class="tt" data-bs-toggle="tooltip" data-bs-title="<strong>CONO TRUNCADO</strong><br><br>Geometría más realista con radio inferior r y superior R₀.<br>Área transversal: \\(A(h)=\\pi[r + \\frac{R_0-r}{H}h]^2\\)">
+      🔺 Geometría variable
+    </span>
+  </p>
+
+  <div class="row g-3 align-items-stretch mb-4">
+    <div class="col-lg-4">
+      <div class="card h-100"><div class="card-body">
+        <h6 class="text-secondary mb-3">
+          Parámetros del cono truncado
+          <span class="tt" data-bs-toggle="tooltip" data-bs-title="<strong>GEOMETRÍA CONO TRUNCADO</strong><br><br>• r: radio del cuello (base)<br>• R₀: radio de la boca (parte superior)<br>• H: altura total<br><br>Condición: R₀ > r">
+            ⓘ
+          </span>
+        </h6>
+        
+        <div class="mb-3">
+          <span class="geometry-badge">A(h) = π[r + ((R₀-r)/H)h]²</span>
+        </div>
+
+        <div class="param-grid">
+          <div><label class="form-label">r (m) — radio cuello</label><input type="number" step="any" class="form-control" id="paramr" value="0.1"></div>
+          <div><label class="form-label">R₀ (m) — radio boca</label><input type="number" step="any" class="form-control" id="paramR0" value="0.4"></div>
+          <div><label class="form-label">H (m) — altura total</label><input type="number" step="any" class="form-control" id="paramH" value="1.0"></div>
+          <div><label class="form-label">g (m/s²)</label><input type="number" step="any" class="form-control" id="paramg" value="9.8"></div>
+          <div><label class="form-label">h₀ (m)</label><input type="number" step="any" class="form-control" id="paramh0" value="1.0"></div>
+          <div class="full">
+            <label class="form-label">paso (m) — resolución</label>
+            <input type="number" step="any" class="form-control" id="paramPaso" value="0.05">
+          </div>
+
+          <div><label class="form-label">a inicial (m²)</label><input type="number" step="any" class="form-control" id="paramK0" value="0.0001"></div>
+          <div><label class="form-label">Δa (incremento)</label><input type="number" step="any" class="form-control" id="paramdK" value="0.00005"></div>
+          <div class="full">
+            <label class="form-label">n° de curvas</label>
+            <input type="number" step="1" min="1" class="form-control" id="paramNcurves" value="8">
+          </div>
+        </div>
+
+        <div class="mt-3 d-flex justify-content-between align-items-center">
+          <button class="btn btn-outline-secondary btn-sm" id="reset" type="button">Restablecer</button>
+          <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#explicacionModal">
+            Ver explicación
+          </button>
+        </div>
+      </div></div>
+    </div>
+
+    <div class="col-lg-8">
+      <div class="card h-100"><div class="card-body">
+        <h6 class="text-secondary mb-2">Curvas \(h(t)\) para distintas áreas de salida \(a\)</h6>
+        <canvas id="chart" height="140"></canvas>
+      </div></div>
+    </div>
+  </div>
+
+  <!-- Tabla resumen de cada curva -->
+  <div class="card mb-4">
+    <div class="card-body">
+      <h6 class="text-secondary mb-2">Resumen por curva - Efecto del área de salida</h6>
+      <div class="table-responsive">
+        <table class="table table-sm align-middle">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Curva</th>
+              <th>a (m²)</th>
+              <th>t<sub>vac</sub> (s)</th>
+              <th>a/A(h₀)</th>
+            </tr>
+          </thead>
+          <tbody id="tbodyCurves"></tbody>
+        </table>
+      </div>
+      <div class="small text-muted">
+        A(h₀) = ${(Math.PI * (parseFloat(document.getElementById('paramR0')?.value || 0.4) ** 2)).toFixed(4)} m² (área en la boca)
+      </div>
+    </div>
+  </div>
+
+  <!-- Código de clase con tooltips -->
+  <div class="code-wrap mb-4">
+    <button class="copy-btn" id="copy" type="button">Copiar código</button>
+    <pre class="code"><code id="code-block"></code></pre>
+  </div>
+</div>
+
+<!-- ===== Modal de explicación ===== -->
+<div class="modal fade" id="explicacionModal" tabindex="-1" aria-labelledby="explicacionLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="explicacionLabel">Barrido del área de salida en Cono Truncado</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        <h6>1. Método Numérico Aplicado al Cono Truncado</h6>
+        <p>Usamos exactamente la misma estructura de clase pero adaptada a la geometría del cono truncado:</p>
+        
+        <div class="alert alert-info small">
+          <strong>Función A(h) para cono truncado:</strong><br>
+          \( R(h) = r + \dfrac{R_0 - r}{H}h \)<br>
+          \( A(h) = \pi [R(h)]^2 = \pi \left[r + \dfrac{R_0 - r}{H}h\right]^2 \)
+        </div>
+
+        <h6>2. Algoritmo de Barrido</h6>
+        <ol>
+          <li><strong>Fijar geometría:</strong> r, R₀, H del cono truncado</li>
+          <li><strong>Variar área de salida:</strong> a = a₀, a₀ + Δa, a₀ + 2Δa, ...</li>
+          <li><strong>Para cada a:</strong> ejecutar <code>h_num_cono_truncado()</code> (mismo método de clase)</li>
+          <li><strong>Integrar:</strong> \( \displaystyle t(h) = \int_{h}^{h_0} \frac{A(\xi)}{a\sqrt{2g\xi}} d\xi \)</li>
+          <li><strong>Graficar:</strong> cada curva con su área correspondiente</li>
+        </ol>
+
+        <h6>3. Observaciones Físicas</h6>
+        <div class="alert alert-warning small">
+          <strong>Efecto del área variable:</strong> En un cono truncado, el área transversal A(h) disminuye 
+          hacia abajo. Esto acelera el vaciado inicial pero lo ralentiza al final, creando curvas características.
+        </div>
+
+        <h6>4. Comparación con Cilindro</h6>
+        <ul>
+          <li><strong>Cilindro:</strong> A constante → vaciado uniforme</li>
+          <li><strong>Cono truncado:</strong> A decreciente → vaciado acelerado inicial + ralentizado final</li>
+          <li><strong>Cono perfecto:</strong> A ∝ h² → vaciado muy rápido inicial + muy lento final</li>
+        </ul>
+
+        <h6>5. Implementación en Código</h6>
+        <p>Mantenemos la estructura idéntica al método de clase:</p>
+        <pre><code>def h_num_cono_truncado(h_0, paso, r, R0, H, a, g):
+    aux = int(h_0 / paso)
+    t_num = []; y_num = []; error_num = []
+    y = h_0
+    for i in range(1, aux + 1):
+        value, error = integrate.quad(integrando, y, h_0)
+        y_num.append(y); t_num.append(value)
+        y = y - paso
+    return t_num, y_num, error_num</code></pre>
+
+        <div class="alert alert-success mt-3">
+          <strong>Conclusión:</strong> El barrido del área de salida en el cono truncado muestra cómo la geometría 
+          variable afecta dramáticamente la dinámica del vaciado, con comportamientos intermedios entre el cilindro y el cono perfecto.
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

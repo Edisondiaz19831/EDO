@@ -1,0 +1,558 @@
+{% extends "base.html" %}
+{% block title %}Cono Truncado — Solución Analítica{% endblock %}
+
+{% block head %}
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<!-- MathJax para renderizado LaTeX -->
+
+<style>
+  .code-wrap{
+    background:#0b1020;color:#e5e7eb;border-radius:10px;padding:1rem 1.25rem;
+    border:1px solid #111827;overflow-x:auto;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    line-height:1.45; position: relative;
+  }
+  .tt{
+    cursor:help; text-decoration: underline dotted;
+    border-bottom: 1px dotted #60a5fa; color: #93c5fd;
+  }
+  .tt:hover { color: #bfdbfe; }
+  .lead-note{ font-size:.95rem; color:#4b5563; }
+  .param-grid{ display:grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap:12px; }
+  .param-grid .full{ grid-column: 1 / -1; }
+  .copy-btn{
+    position:absolute; top:8px; right:8px; font-size:.85rem;
+    background:#111827; color:#e5e7eb; border:1px solid #374151; border-radius:6px; padding:.25rem .5rem;
+  }
+  .geometry-diagram {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 20px;
+    text-align: center;
+    margin: 15px 0;
+  }
+  .formula-derivation {
+    background: #f8f9fa;
+    border-left: 4px solid #0d6efd;
+    padding: 15px;
+    margin: 10px 0;
+    border-radius: 4px;
+  }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  // ---------- Tooltips con LaTeX ----------
+  const initTooltips = () => {
+    const tips = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    tips.forEach((el) => {
+      new bootstrap.Tooltip(el, {
+        html: true,
+        trigger: 'hover focus',
+        sanitize: false,
+        container: 'body',
+        customClass: 'math-tooltip',
+        delay: { show: 300, hide: 100 }
+      });
+      el.addEventListener('shown.bs.tooltip', () => {
+        const id = el.getAttribute('aria-describedby');
+        const tip = id && document.getElementById(id);
+        if (tip && window.MathJax && MathJax.typesetPromise) {
+          const inner = tip.querySelector('.tooltip-inner');
+          if (inner) MathJax.typesetPromise([inner]).catch(() => {});
+        }
+      });
+    });
+  };
+
+  // ---------- Parámetros (inputs) ----------
+  const aEl  = document.getElementById('parama');
+  const gEl  = document.getElementById('paramg');
+  const h0El = document.getElementById('paramh0');
+  const rEl  = document.getElementById('paramr');
+  const R0El = document.getElementById('paramR0');
+  const HEl  = document.getElementById('paramH');
+  const nEl  = document.getElementById('paramN');
+  const tvacOut = document.getElementById('tvac');
+
+  // ---------- Modelo analítico (cono truncado) ----------
+  // A(h) = π[r + ((R₀ - r)/H)h]²
+  // t(h) = (π/(a√(2g))) * ∫[h₀→h] (r + αξ)²/√ξ dξ, donde α = (R₀ - r)/H
+  function computeSeries(a, g, h0, r, R0, H, N=600){
+    const alpha = (R0 - r) / H;
+    const C = Math.PI / (a * Math.sqrt(2 * g));
+    
+    // Tiempo de vaciado total T (cuando h=0)
+    const T = C * (
+      2 * r * r * Math.sqrt(h0) +
+      (4 * r * alpha / 3) * Math.pow(h0, 1.5) +
+      (2 * alpha * alpha / 5) * Math.pow(h0, 2.5)
+    );
+
+    // Generar curva h(t) invirtiendo t(h)
+    const t = [], y = [];
+    for (let i=0; i<N; i++){
+      const ti = i * T / (N-1);
+      // Encontrar h tal que t(h) = ti usando bisección
+      let h_low = 0, h_high = h0;
+      let h_current = h0;
+      for(let iter=0; iter<50; iter++){
+        h_current = (h_low + h_high) / 2;
+        const t_current = C * (
+          2 * r * r * (Math.sqrt(h0) - Math.sqrt(h_current)) +
+          (4 * r * alpha / 3) * (Math.pow(h0, 1.5) - Math.pow(h_current, 1.5)) +
+          (2 * alpha * alpha / 5) * (Math.pow(h0, 2.5) - Math.pow(h_current, 2.5))
+        );
+        if(t_current > ti) h_low = h_current;
+        else h_high = h_current;
+      }
+      t.push(ti);
+      y.push(h_current);
+    }
+    return {t, y, T};
+  }
+
+  // ---------- Gráfico ----------
+  const ctx = document.getElementById('chart').getContext('2d');
+  let chart;
+
+  function updateChart(a, g, h0, r, R0, H, N){
+    const {t, y, T} = computeSeries(a, g, h0, r, R0, H, N);
+    tvacOut.textContent = T.toFixed(4) + ' s';
+
+    const points = t.map((ti, i) => ({ x: ti, y: y[i] }));
+
+    if (!chart){
+      chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          datasets: [{
+            label: 'h(t)',
+            data: points,
+            borderColor: '#3b82f6',
+            backgroundColor: 'rgba(59,130,246,0.1)',
+            borderWidth: 2,
+            tension: 0.1,
+            fill: true,
+            pointRadius: 0,
+            pointHoverRadius: 4
+          }]
+        },
+        options: {
+          parsing: false,
+          animation: { duration: 0 },
+          responsive: true,
+          interaction: { intersect: false, mode: 'index' },
+          scales: {
+            x: {
+              type: 'linear',
+              title: { display: true, text: 't (s)', color: '#6b7280', font: { size: 12 } },
+              grid: { color: 'rgba(0,0,0,0.06)', drawBorder: false },
+              ticks: { color: '#9ca3af', maxTicksLimit: 8 }
+            },
+            y: {
+              title: { display: true, text: 'h(t) (m)', color: '#6b7280', font: { size: 12 } },
+              suggestedMin: 0,
+              suggestedMax: Math.max(1, h0),
+              grid: { color: 'rgba(0,0,0,0.06)', drawBorder: false },
+              ticks: { color: '#9ca3af', maxTicksLimit: 6 }
+            }
+          },
+          plugins: { legend: { display: false } }
+        }
+      });
+    } else {
+      chart.data.datasets[0].data = points;
+      chart.options.scales.y.suggestedMax = Math.max(1, h0);
+      chart.update();
+    }
+  }
+
+  // ---------- Código Python "vivo" con tooltips MEJORADOS ----------
+  const codeEl = document.getElementById('code-block');
+
+  function renderCode(a, g, h0, r, R0, H){
+    const a_txt = a.toExponential(6);
+    const g_txt = g.toPrecision(6);
+    const h0_txt = h0.toPrecision(6);
+    const r_txt = r.toPrecision(6);
+    const R0_txt = R0.toPrecision(6);
+    const H_txt  = H.toPrecision(6);
+
+    const codeHtml = `
+<span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+  data-bs-title="<strong>NUMPY - CÁLCULO NUMÉRICO</strong><br><br>Librería fundamental para operaciones matemáticas y manejo de arrays en Python.<br><br>Nos permite trabajar con vectores de tiempo y evaluar funciones vectorialmente.">
+import numpy as <b>np</b></span>
+<span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+  data-bs-title="<strong>MATPLOTLIB - VISUALIZACIÓN</strong><br><br>Librería estándar para creación de gráficos y visualizaciones científicas.<br><br>Usaremos <code>pyplot</code> para generar el gráfico de h(t) vs t.">
+import matplotlib.pyplot as <b>plt</b></span>
+<span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+  data-bs-title="<strong>SCIPY - MÉTODOS NUMÉRICOS AVANZADOS</strong><br><br>Librería para cálculo científico, usada aquí para encontrar raíces de ecuaciones.<br><br>Necesaria para invertir la relación t(h) → h(t).">
+from scipy.optimize import <b>root_scalar</b></span>
+
+# parámetros del sistema (cono truncado)
+<span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+  data-bs-title="<strong>ÁREA DEL ORIFICIO (a)</strong><br><br>\\[ a = ${a}\\,\\mathrm{m}^2 \\]<br><br>Representa el área de la sección de salida del fluido.<br><br><strong>Relación física:</strong> Determina el caudal de salida según Torricelli:<br>\\[ Q = a \\cdot v = a \\sqrt{2gh} \\]">
+a   = ${a_txt}   # m²</span>
+<span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+  data-bs-title="<strong>ACELERACIÓN GRAVITACIONAL (g)</strong><br><br>\\[ g = ${g}\\,\\mathrm{m/s^2} \\]<br><br>Aceleración debida a la gravedad que impulsa el flujo.<br><br><strong>En Torricelli:</strong> \\[ v = \\sqrt{2gh} \\]<br>La velocidad de salida depende de la raíz cuadrada de g.">
+g   = ${g_txt}   # m/s²</span>
+<span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+  data-bs-title="<strong>ALTURA INICIAL (h₀)</strong><br><br>\\[ h_0 = ${h0}\\,\\mathrm{m} \\]<br><br>Altura inicial del fluido en el cono truncado.<br><br><strong>Importancia:</strong> Límite superior de integración en t(h).">
+h0  = ${h0_txt}  # m</span>
+<span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+  data-bs-title="<strong>RADIO DEL CUELLO (r)</strong><br><br>\\[ r = ${r}\\,\\mathrm{m} \\]<br><br>Radio en la base del cono truncado.<br><br><strong>Geometría:</strong> Define el tamaño del 'cuello' del tanque.<br>Cuando r → 0, recuperamos el cono perfecto.">
+r   = ${r_txt}   # m</span>
+<span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+  data-bs-title="<strong>RADIO DE LA BOCA (R₀)</strong><br><br>\\[ R_0 = ${R0}\\,\\mathrm{m} \\]<br><br>Radio en la parte superior del cono truncado.<br><br><strong>Condición física:</strong> \\[ R_0 > r \\]<br>Para que sea un cono truncado válido.">
+R0  = ${R0_txt}  # m</span>
+<span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+  data-bs-title="<strong>ALTURA TOTAL DEL CONO (H)</strong><br><br>\\[ H = ${H}\\,\\mathrm{m} \\]<br><br>Altura total del cono truncado.<br><br><strong>Relación geométrica:</strong> Define la pendiente de las paredes:<br>\\[ \\text{pendiente} = \\frac{R_0 - r}{H} \\]">
+H   = ${H_txt}   # m</span>
+
+<span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+  data-bs-title="<strong>FUNCIÓN t(h) - RELACIÓN FUNDAMENTAL</strong><br><br><strong>Geometría del cono truncado:</strong><br>\\[ A(h) = \\pi \\left[r + \\frac{R_0 - r}{H}h\\right]^2 \\]<br><br><strong>Ecuación diferencial integrada:</strong><br>\\[ t(h) = \\frac{\\pi}{a\\sqrt{2g}} \\int_h^{h_0} \\frac{\\left[r + \\alpha\\xi\\right]^2}{\\sqrt{\\xi}} d\\xi \\]<br>donde \\[ \\alpha = \\frac{R_0 - r}{H} \\]">
+def t_of_h(h, h0, a, r, R0, H, g=9.8):</span>
+    <span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+      data-bs-title="<strong>CONSTANTE α - PENDIENTE RADIAL</strong><br><br>\\[ \\alpha = \\frac{R_0 - r}{H} \\]<br><br><strong>Interpretación física:</strong><br>• Representa cuánto crece el radio por unidad de altura<br>• Cuando α es grande, el cono se abre rápidamente<br>• Cuando α es pequeño, el cono es casi cilíndrico">
+    alpha = (R0 - r) / H</span>
+    <span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+      data-bs-title="<strong>CONSTANTE DE INTEGRACIÓN C</strong><br><br>\\[ C = \\frac{\\pi}{a\\sqrt{2g}} \\]<br><br><strong>Agrupa:</strong><br>• \\[\\pi\\] - factor geométrico del área<br>• \\[a\\] - área del orificio<br>• \\[\\sqrt{2g}\\] - factor de Torricelli<br><br>Esta constante escala todo el tiempo de vaciado.">
+    C = np.pi / (a * np.sqrt(2*g))</span>
+    <span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+      data-bs-title="<strong>INTEGRAL ANALÍTICA t(h)</strong><br><br>Desarrollando la integral:<br>\\[ \\int \\frac{(r + \\alpha\\xi)^2}{\\sqrt{\\xi}} d\\xi = \\int \\left(r^2\\xi^{-1/2} + 2r\\alpha\\xi^{1/2} + \\alpha^2\\xi^{3/2}\\right) d\\xi \\]<br><br>Resultado:<br>\\[ 2r^2\\sqrt{\\xi} + \\frac{4}{3}r\\alpha\\xi^{3/2} + \\frac{2}{5}\\alpha^2\\xi^{5/2} \\]">
+    integral = (2*r**2 * (np.sqrt(h0) - np.sqrt(h)) +
+                (4*r*alpha/3) * (h0**1.5 - h**1.5) +
+                (2*alpha**2/5) * (h0**2.5 - h**2.5))</span>
+    return C * integral
+
+<span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+  data-bs-title="<strong>FUNCIÓN h(t) - INVERSIÓN NUMÉRICA</strong><br><br>Dado que no podemos despejar h(t) analíticamente de t(h), usamos métodos numéricos.<br><br><strong>Problema:</strong> Encontrar h tal que t(h) = t<br><strong>Solución:</strong> Búsqueda de raíces con <code>root_scalar</code>">
+def h_of_t(t, h0, a, r, R0, H, g=9.8):</span>
+    <span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+      data-bs-title="<strong>FUNCIÓN OBJETIVO PARA BÚSQUEDA DE RAÍCES</strong><br><br>Definimos:<br>\\[ f(h) = t(h) - t \\]<br><br>Queremos encontrar h tal que f(h) = 0<br><br>Usamos el método de Brent que combina:<br>• Bisección<br>• Interpolación cuadrática<br>• Seguridad y eficiencia">
+    def objective(h):
+        return t_of_h(h, h0, a, r, R0, H, g) - t</span>
+    <span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+      data-bs-title="<strong>BÚSQUEDA DE RAÍZ CON SCIPY</strong><br><br><code>root_scalar</code> encuentra la raíz de f(h) = 0 en el intervalo [0, h₀]<br><br><strong>Propiedades:</strong><br>• f(0) = T > 0 (tiempo total)<br>• f(h₀) = -t < 0<br>• f(h) es continua y monótona decreciente">
+    result = root_scalar(objective, bracket=[0, h0], method='brentq')</span>
+    return result.root
+
+<span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+  data-bs-title="<strong>TIEMPO DE VACIADO TOTAL T</strong><br><br>Calculado analíticamente cuando h = 0:<br>\\[ T = t(0) = \\frac{\\pi}{a\\sqrt{2g}} \\left(2r^2\\sqrt{h_0} + \\frac{4}{3}r\\alpha h_0^{3/2} + \\frac{2}{5}\\alpha^2 h_0^{5/2}\\right) \\]<br><br><strong>Interpretación:</strong> Cada término representa contribuciones de diferentes órdenes en la geometría">
+T = t_of_h(0, h0, a, r, R0, H, g)</span>
+print("Tiempo de vaciado total T ≈", T, "s")
+
+# Generar curva h(t) invirtiendo numéricamente t(h)
+<span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+  data-bs-title="<strong>GENERACIÓN DE LA CURVA h(t)</strong><br><br>Para cada tiempo t en [0, T], resolvemos numéricamente:<br>\\[ t(h) = t \\]<br>para obtener h(t)<br><br><strong>Vectorización:</strong> Aplicamos <code>h_of_t</code> a cada elemento del array de tiempos">
+t_values = np.linspace(0, T, 600)</span>
+<span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+  data-bs-title="<strong>EVALUACIÓN VECTORIAL</strong><br><br>Usamos comprensión de listas para aplicar <code>h_of_t</code> a cada tiempo.<br><br><strong>Alternativa más eficiente:</strong> Para muchos puntos, podría implementarse una versión vectorizada usando <code>np.vectorize</code>">
+h_values = [h_of_t(t, h0, a, r, R0, H, g) for t in t_values]</span>
+
+# Visualización
+<span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+  data-bs-title="<strong>GRÁFICO DE LA SOLUCIÓN</strong><br><br>Mostramos la evolución temporal de la altura.<br><br><strong>Características esperadas:</strong><br>• Curva suave y decreciente<br>• Derivada infinita en t = T<br>• Comportamiento no-lineal debido a la geometría variable">
+plt.figure(figsize=(10, 6))</span>
+plt.plot(t_values, h_values, 'b-', linewidth=2, label='Cono truncado (solución numérica)')
+plt.ylim(0, max(1, h0))
+plt.xlabel("Tiempo t (s)")
+plt.ylabel("Altura h(t) (m)")
+plt.title("Vaciado de cono truncado — Solución por inversión de t(h)")
+plt.grid(True, alpha=0.3, linestyle='--')
+plt.legend()
+plt.tight_layout()
+plt.show()`;
+
+    codeEl.textContent = '';
+    codeEl.innerHTML = codeHtml;
+
+    setTimeout(() => {
+      initTooltips();
+      if (window.MathJax && MathJax.typesetPromise) {
+        MathJax.typesetPromise([codeEl]).catch(() => {});
+      }
+    }, 100);
+  }
+
+  // ---------- Reset ----------
+  const resetBtn = document.getElementById('reset');
+  const defaults = { a:0.001, g:9.8, h0:1.0, r:0.1, R0:0.4, H:1.0, N:600 };
+  resetBtn.addEventListener('click', () => {
+    aEl.value  = defaults.a;
+    gEl.value  = defaults.g;
+    h0El.value = defaults.h0;
+    rEl.value  = defaults.r;
+    R0El.value = defaults.R0;
+    HEl.value  = defaults.H;
+    nEl.value  = defaults.N;
+    updateAll();
+  });
+
+  // ---------- Ciclo de actualización ----------
+  function updateAll(){
+    const a  = Math.max(1e-12, parseFloat(aEl.value));
+    const g  = Math.max(1e-12, parseFloat(gEl.value));
+    const h0 = Math.max(0, parseFloat(h0El.value));
+    const r  = Math.max(1e-12, parseFloat(rEl.value));
+    const R0 = Math.max(r + 1e-12, parseFloat(R0El.value));
+    const H  = Math.max(1e-12, parseFloat(HEl.value));
+    const N  = Math.max(2, parseInt(nEl.value || '600', 10));
+
+    renderCode(a, g, h0, r, R0, H);
+    updateChart(a, g, h0, r, R0, H, N);
+  }
+
+  [aEl, gEl, h0El, rEl, R0El, HEl, nEl].forEach(inp => {
+    inp.addEventListener('input', updateAll);
+    inp.addEventListener('change', updateAll);
+  });
+
+  // Copiar código
+  const copyBtn = document.getElementById('copy');
+  copyBtn.addEventListener('click', () => {
+    const tmp = document.createElement('textarea');
+    tmp.value = codeEl.innerText;
+    document.body.appendChild(tmp);
+    tmp.select();
+    document.execCommand('copy');
+    document.body.removeChild(tmp);
+    copyBtn.textContent = '¡Copiado!';
+    setTimeout(()=> copyBtn.textContent = 'Copiar código', 1200);
+  });
+
+  // LaTeX en el MODAL
+  const explanationModal = document.getElementById('explicacionModal');
+  if (explanationModal){
+    explanationModal.addEventListener('shown.bs.modal', () => {
+      if (window.MathJax && MathJax.typesetPromise) {
+        MathJax.typesetPromise([explanationModal]).catch(() => {});
+      }
+    });
+  }
+
+  // Inicialización
+  initTooltips();
+  updateAll();
+});
+</script>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+  <h1 class="h3 mb-2">Cono Truncado — Solución Analítica con Inversión Numérica</h1>
+  <p class="lead-note mb-3">
+    Para un cono truncado con radio inferior \(r\) y superior \(R_0\), el área transversal es 
+    \(A(h)=\pi\left[r + \frac{R_0-r}{H}h\right]^2\). La solución requiere inversión numérica de \(t(h)\).
+    <span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+      data-bs-title="<strong>COMPLEJIDAD MATEMÁTICA</strong><br><br>El cono truncado genera una integral que no permite solución explícita h(t).<br><br><strong>Solución:</strong> Calculamos t(h) analíticamente e invertimos numéricamente.<br><br>Esto es típico en problemas de vaciado con geometrías complejas.">
+      💡 Método híbrido analítico-numérico
+    </span>
+  </p>
+
+  <div class="row g-3 align-items-stretch mb-4">
+    <div class="col-lg-4">
+      <div class="card h-100">
+        <div class="card-body">
+          <h6 class="text-secondary mb-3">
+            Parámetros del cono truncado
+            <span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+              data-bs-title="<strong>GEOMETRÍA DEL CONO TRUNCADO</strong><br><br>Definido por tres parámetros geométricos:<br>• Radio inferior r (cuello)<br>• Radio superior R₀ (boca)<br>• Altura total H<br><br><strong>Condición:</strong> R₀ > r para que sea un cono truncado válido">
+              ⓘ
+            </span>
+          </h6>
+
+          <div class="param-grid">
+            <div>
+              <label class="form-label">a (m²) — área del orificio</label>
+              <input type="number" step="any" class="form-control" id="parama" value="0.001">
+            </div>
+
+            <div>
+              <label class="form-label">g (m/s²)</label>
+              <input type="number" step="any" class="form-control" id="paramg" value="9.8">
+            </div>
+
+            <div>
+              <label class="form-label">h₀ (m)</label>
+              <input type="number" step="any" class="form-control" id="paramh0" value="1.0">
+            </div>
+
+            <div>
+              <label class="form-label">r (m) — radio del cuello</label>
+              <input type="number" step="any" class="form-control" id="paramr" value="0.1">
+            </div>
+
+            <div>
+              <label class="form-label">R₀ (m) — radio de la boca</label>
+              <input type="number" step="any" class="form-control" id="paramR0" value="0.4">
+            </div>
+
+            <div>
+              <label class="form-label">H (m) — altura total</label>
+              <input type="number" step="any" class="form-control" id="paramH" value="1.0">
+            </div>
+
+            <div class="full">
+              <label class="form-label">N (puntos de discretización)</label>
+              <input type="number" step="1" min="50" class="form-control" id="paramN" value="600">
+            </div>
+          </div>
+
+          <div class="mt-3 d-flex justify-content-between align-items-center">
+            <button class="btn btn-outline-secondary btn-sm" id="reset" type="button">Restablecer</button>
+            <span class="badge bg-primary fs-6">
+              \(T\) = <span id="tvac">—</span>
+              <span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+                data-bs-title="<strong>TIEMPO DE VACIADO - FÓRMULA COMPLETA</strong><br><br>\\[ T = \\frac{\\pi}{a\\sqrt{2g}} \\left(2r^2\\sqrt{h_0} + \\frac{4}{3}r\\alpha h_0^{3/2} + \\frac{2}{5}\\alpha^2 h_0^{5/2}\\right) \\]<br><br><strong>Términos:</strong><br>• 1er término: contribución del cuello (r²)<br>• 2do término: término cruzado (rα)<br>• 3er término: contribución de la apertura (α²)">
+                ⓘ
+              </span>
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-8">
+      <div class="card h-100">
+        <div class="card-body">
+          <h6 class="text-secondary mb-3">
+            Evolución temporal \(h(t)\) por inversión numérica
+            <span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+              data-bs-title="<strong>MÉTODO DE SOLUCIÓN</strong><br><br>1. Calculamos t(h) analíticamente<br>2. Para cada tiempo t, resolvemos t(h) = t<br>3. Obtenemos h(t) punto por punto<br><br><strong>Ventaja:</strong> Precisión analítica en la integración<br><strong>Desventaja:</strong> Requiere métodos numéricos para la inversión">
+              ⓘ
+            </span>
+          </h6>
+
+          <canvas id="chart" height="120"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Diagrama geométrico -->
+  <div class="geometry-diagram mb-4">
+    <h6 class="mb-3">Geometría del Cono Truncado</h6>
+    <div class="row align-items-center">
+      <div class="col-md-6">
+        <p class="mb-2"><strong>Radio variable:</strong> \( R(h) = r + \dfrac{R_0 - r}{H}h \)</p>
+        <p class="mb-2"><strong>Área transversal:</strong> \( A(h) = \pi \left[r + \dfrac{R_0 - r}{H}h\right]^2 \)</p>
+        <p class="mb-0"><strong>Pendiente radial:</strong> \( \alpha = \dfrac{R_0 - r}{H} \)</p>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="d-flex justify-content-between align-items-center mb-2">
+    <h6 class="mb-0 text-secondary">Código Python con solución híbrida analítico-numérica</h6>
+    <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#explicacionModal">
+      Ver derivación matemática completa
+    </button>
+  </div>
+
+  <div class="code-wrap mb-4">
+    <button class="copy-btn" id="copy" type="button">Copiar código</button>
+    <pre class="code"><code id="code-block"></code></pre>
+  </div>
+</div>
+
+<!-- ===== Modal de explicación matemática ===== -->
+<div class="modal fade" id="explicacionModal" tabindex="-1" aria-labelledby="explicacionLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="explicacionLabel">Derivación Completa: Cono Truncado con \(A(h)\) Lineal</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+
+      <div class="modal-body">
+        <h6>1. Geometría del Cono Truncado</h6>
+        <p>Para un cono truncado con radio inferior \(r\) y superior \(R_0\), la variación del radio con la altura es lineal:</p>
+        <div class="formula-derivation">
+          \( R(h) = r + \dfrac{R_0 - r}{H}h \)
+        </div>
+        <p>El área transversal resulta:</p>
+        <div class="formula-derivation">
+          \( A(h) = \pi [R(h)]^2 = \pi \left[r + \dfrac{R_0 - r}{H}h\right]^2 \)
+        </div>
+
+        <h6>2. Ecuación Diferencial del Vaciado</h6>
+        <p>Por conservación de masa y ley de Torricelli:</p>
+        <div class="formula-derivation">
+          \( A(h)\dfrac{dh}{dt} = -a\sqrt{2gh} \)
+        </div>
+        <p>Sustituyendo \(A(h)\):</p>
+        <div class="formula-derivation">
+          \( \pi \left[r + \dfrac{R_0 - r}{H}h\right]^2 \dfrac{dh}{dt} = -a\sqrt{2gh} \)
+        </div>
+
+        <h6>3. Separación de Variables</h6>
+        <p>Reordenamos para separar variables:</p>
+        <div class="formula-derivation">
+          \( \dfrac{\left[r + \dfrac{R_0 - r}{H}h\right]^2}{\sqrt{h}} dh = -\dfrac{a}{\pi}\sqrt{2g} dt \)
+        </div>
+        <p>Definiendo \(\alpha = \dfrac{R_0 - r}{H}\) para simplificar:</p>
+        <div class="formula-derivation">
+          \( \dfrac{(r + \alpha h)^2}{\sqrt{h}} dh = -\dfrac{a}{\pi}\sqrt{2g} dt \)
+        </div>
+
+        <h6>4. Desarrollo del Integrando</h6>
+        <p>Expandimos el numerador:</p>
+        <div class="formula-derivation">
+          \( (r + \alpha h)^2 = r^2 + 2r\alpha h + \alpha^2 h^2 \)
+        </div>
+        <p>Dividimos término a término por \(\sqrt{h}\):</p>
+        <div class="formula-derivation">
+          \( \dfrac{(r + \alpha h)^2}{\sqrt{h}} = r^2 h^{-1/2} + 2r\alpha h^{1/2} + \alpha^2 h^{3/2} \)
+        </div>
+
+        <h6>5. Integración Analítica</h6>
+        <p>Integramos ambos lados de \(h_0\) a \(h\):</p>
+        <div class="formula-derivation">
+          \( \int_{h_0}^{h} \left(r^2 \xi^{-1/2} + 2r\alpha \xi^{1/2} + \alpha^2 \xi^{3/2}\right) d\xi = -\dfrac{a}{\pi}\sqrt{2g} \int_0^t d\tau \)
+        </div>
+        <p>Resolviendo las integrales:</p>
+        <div class="formula-derivation">
+          \( \left[2r^2 \xi^{1/2} + \dfrac{4}{3}r\alpha \xi^{3/2} + \dfrac{2}{5}\alpha^2 \xi^{5/2}\right]_{h_0}^{h} = -\dfrac{a}{\pi}\sqrt{2g} t \)
+        </div>
+        <p>Evaluando los límites:</p>
+        <div class="formula-derivation">
+          \( 2r^2(\sqrt{h} - \sqrt{h_0}) + \dfrac{4}{3}r\alpha(h^{3/2} - h_0^{3/2}) + \dfrac{2}{5}\alpha^2(h^{5/2} - h_0^{5/2}) = -\dfrac{a}{\pi}\sqrt{2g} t \)
+        </div>
+
+        <h6>6. Relación \(t(h)\) Final</h6>
+        <p>Reordenando para obtener \(t(h)\) explícitamente:</p>
+        <div class="formula-derivation">
+          \( t(h) = \dfrac{\pi}{a\sqrt{2g}} \left[2r^2(\sqrt{h_0} - \sqrt{h}) + \dfrac{4}{3}r\alpha(h_0^{3/2} - h^{3/2}) + \dfrac{2}{5}\alpha^2(h_0^{5/2} - h^{5/2})\right] \)
+        </div>
+
+        <h6>7. Tiempo de Vaciado Total \(T\)</h6>
+        <p>Cuando \(h = 0\):</p>
+        <div class="formula-derivation">
+          \( T = \dfrac{\pi}{a\sqrt{2g}} \left(2r^2\sqrt{h_0} + \dfrac{4}{3}r\alpha h_0^{3/2} + \dfrac{2}{5}\alpha^2 h_0^{5/2}\right) \)
+        </div>
+
+        <h6>8. Inversión Numérica para \(h(t)\)</h6>
+        <p>Dado que no podemos despejar \(h(t)\) analíticamente, usamos métodos numéricos:</p>
+        <div class="formula-derivation">
+          \( \text{Encontrar } h \text{ tal que } t(h) = t \)
+        </div>
+        <p>Usamos el método de Brent para encontrar la raíz de:</p>
+        <div class="formula-derivation">
+          \( f(h) = t(h) - t = 0 \)
+        </div>
+
+        <div class="alert alert-info mt-3">
+          <strong>Nota:</strong> Esta solución híbrida (analítica para \(t(h)\), numérica para \(h(t)\)) es común en problemas de vaciado con geometrías complejas donde la inversión analítica no es posible.
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

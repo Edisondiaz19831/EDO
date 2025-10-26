@@ -1,0 +1,420 @@
+{% extends "base.html" %}
+{% block title %}Cono perfecto — Método numérico (versión clase){% endblock %}
+
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<!-- MathJax para renderizado LaTeX -->
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+<style>
+  .code-wrap{background:#0b1020;color:#e5e7eb;border-radius:10px;padding:1rem 1.25rem;border:1px solid #111827;overflow-x:auto;font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;line-height:1.45;position:relative}
+  .tt{cursor:help;text-decoration:underline dotted;border-bottom:1px dotted #60a5fa;color:#93c5fd}
+  .tt:hover{color:#bfdbfe}
+  .param-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+  .param-grid .full{grid-column:1/-1}
+  .copy-btn{position:absolute;top:8px;right:8px;font-size:.85rem;background:#111827;color:#e5e7eb;border:1px solid #374151;border-radius:6px;padding:.25rem .5rem}
+  .legend-pill{display:inline-flex;align-items:center;gap:.4rem;padding:.25rem .5rem;border-radius:9999px;border:1px solid #e5e7eb;background:#f8fafc;font-size:.85rem}
+  .dot{width:.7rem;height:.7rem;border-radius:50%;display:inline-block}
+  .table-sm td,.table-sm th{padding:.35rem .5rem}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  // ---------- Tooltips + LaTeX ----------
+  const initTooltips = () => {
+    document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el=>{
+      new bootstrap.Tooltip(el,{html:true,trigger:'hover focus',sanitize:false,container:'body',delay:{show:250,hide:100}});
+      el.addEventListener('shown.bs.tooltip',()=>{
+        const id=el.getAttribute('aria-describedby'); const tip=id&&document.getElementById(id);
+        if(tip && window.MathJax?.typesetPromise){ const inner=tip.querySelector('.tooltip-inner'); if(inner) MathJax.typesetPromise([inner]).catch(()=>{}); }
+      });
+    });
+  };
+
+  // ---------- Inputs ----------
+  const R0El = document.getElementById('paramR0');
+  const HEl  = document.getElementById('paramH');
+  const aEl  = document.getElementById('parama');
+  const gEl  = document.getElementById('paramg');
+  const h0El = document.getElementById('paramh0');
+  const pasoEl = document.getElementById('paramPaso');
+  const showAnal = document.getElementById('toggleAnalitica');
+  const tvacNumOut = document.getElementById('tvacNum');
+  const tvacAnOut  = document.getElementById('tvacAn');
+  const tbodyErr   = document.getElementById('tbodyErr');
+
+  // ---------- Geometría del cono perfecto ----------
+  function Ah_cone(R0,H,h){ return Math.PI * (R0*R0)/(H*H) * h*h; }
+
+  // ---------- Integrando t(h) como en clase ----------
+  function integrandCone(R0,H,a,g,h){
+    if(h<=0) return 0;
+    const Ah = Ah_cone(R0,H,h);
+    return Ah / (a * Math.sqrt(2*g*h));
+  }
+
+  // Simpson adaptativo 1D (emula integrate.quad)
+  function quadSimpson(f, a, b, tol=1e-8, maxDepth=12){
+    const sgn = b>=a ? 1 : -1;
+    const A = Math.min(a,b), B = Math.max(a,b);
+    function S(f, x0, x2){ const x1=0.5*(x0+x2); return (x2-x0)*(f(x0)+4*f(x1)+f(x2))/6; }
+    function adapt(f, x0, x2, S0, depth){
+      const x1=0.5*(x0+x2), Sleft=S(f,x0,x1), Sright=S(f,x1,x2);
+      const err = Math.abs(Sleft+Sright - S0);
+      if(err < 15*tol || depth<=0) return Sleft+Sright + (Sleft+Sright - S0)/15;
+      return adapt(f,x0,x1,Sleft,depth-1) + adapt(f,x1,x2,Sright,depth-1);
+    }
+    const S0=S(f,A,B);
+    return sgn*adapt(f,A,B,S0,maxDepth);
+  }
+
+  // Construye (t_num, y_num) como en el bucle de clase (descendiendo h en pasos)
+  function seriesNumerica_cono(h0, paso, R0, H, a, g){
+    const N = Math.max(1, Math.floor(h0/Math.max(paso,1e-12)));
+    const t_num=[], y_num=[];
+    let y=Math.max(0,h0);
+    for(let i=1;i<=N;i++){
+      const value = quadSimpson(h=>integrandCone(R0,H,a,g,h), y, h0);
+      t_num.push(value);
+      y_num.push(y);
+      y = Math.max(0, y - paso);
+    }
+    const t0 = t_num[0] || 0;
+    const tShift = t_num.map(v=>v - t0);
+    return {t:tShift, y:y_num};
+  }
+
+  // ---------- Analítica para COMPARAR (cono perfecto) ----------
+  function analytic_cone(R0,H,a,g,h0,N=800){
+    const C=(a*H*H)/(Math.PI*R0*R0)*Math.sqrt(2*g);
+    const T=(2/(5*C))*Math.pow(h0,2.5);
+    const t=Array.from({length:N},(_,i)=>i*T/(N-1));
+    const y=t.map(tt => {
+      const inside=Math.max(Math.pow(h0,2.5) - (5/2)*C*tt, 0);
+      return Math.pow(inside, 2/5);
+    });
+    return {t,y,tVac:T};
+  }
+
+  // ---------- Chart ----------
+  const ctx=document.getElementById('chart').getContext('2d');
+  let chart;
+
+  function fillErrorTable(num, an){
+    tbodyErr.innerHTML = '';
+    for(let i=0;i<num.t.length;i++){
+      const h = num.y[i];
+      const tnum = num.t[i];
+      let tan = null, err = '—';
+      if(an){
+        const ya = an.y;
+        let tInterp = null;
+        for(let j=1;j<ya.length;j++){
+          if((ya[j-1]-h)*(ya[j]-h)<=0){
+            const f1 = ya[j-1]-h, f2 = ya[j]-h;
+            const fr = Math.abs(f1)/(Math.abs(f1)+Math.abs(f2));
+            tInterp = an.t[j-1] + fr*(an.t[j]-an.t[j-1]);
+            break;
+          }
+        }
+        if(tInterp==null) tInterp = an.t[an.t.length-1];
+        tan = tInterp;
+        err = Math.abs(tnum - tan);
+      }
+      const tr=document.createElement('tr');
+      tr.innerHTML = `
+        <td class="text-muted">${i+1}</td>
+        <td>${h.toFixed(4)}</td>
+        <td>${tnum.toFixed(4)}</td>
+        <td>${tan!=null ? tan.toFixed(4) : '—'}</td>
+        <td>${tan!=null ? err.toExponential(3) : '—'}</td>
+      `;
+      tbodyErr.appendChild(tr);
+    }
+  }
+
+  function updateChart(){
+    const R0 = Math.max(1e-12, parseFloat(R0El.value));
+    const H  = Math.max(1e-12, parseFloat(HEl.value));
+    const a  = Math.max(1e-12, parseFloat(aEl.value));
+    const g  = Math.max(1e-12, parseFloat(gEl.value));
+    const h0 = Math.max(0, parseFloat(h0El.value));
+    const paso = Math.max(1e-6, Math.min(parseFloat(pasoEl.value), h0));
+
+    const num = seriesNumerica_cono(h0, paso, R0, H, a, g);
+    const numPts = num.t.map((ti,i)=>({x:ti,y:num.y[i]}));
+    let datasets = [{
+      label:'Numérica (quad) — puntos',
+      data:numPts, parsing:false,
+      showLine:false, pointRadius:3.2, pointHoverRadius:4,
+      borderColor:'#10b981', backgroundColor:'#10b981'
+    }];
+
+    let Tnum = num.t[num.t.length-1];
+    if(num.y.length>=2){
+      const h1=num.y[num.y.length-2], h2=num.y[num.y.length-1];
+      const t1=num.t[num.t.length-2], t2=num.t[num.t.length-1];
+      if(h1>0 && h2>=0 && h1!==h2){
+        const frac = h1/(h1-h2);
+        Tnum = t1 + frac*(t2-t1);
+      }
+    }
+    tvacNumOut.textContent = isFinite(Tnum) ? Tnum.toFixed(4)+' s' : '—';
+
+    let an = null;
+    if(showAnal.checked){
+      an = analytic_cone(R0,H,a,g,h0);
+      const anPts = an.t.map((ti,i)=>({x:ti,y:an.y[i]}));
+      datasets.push({
+        label:'Analítica — línea (cono perfecto)',
+        data:anPts, parsing:false,
+        borderColor:'#3b82f6', backgroundColor:'rgba(59,130,246,.06)',
+        borderWidth:2, tension:0.1, fill:false, pointRadius:0
+      });
+      tvacAnOut.textContent = an.tVac.toFixed(4)+' s';
+    } else {
+      tvacAnOut.textContent = '—';
+    }
+
+    fillErrorTable(num, an);
+
+    if(!chart){
+      chart = new Chart(ctx,{
+        type:'line',
+        data:{datasets},
+        options:{
+          parsing:false, animation:{duration:0}, responsive:true,
+          interaction:{intersect:false,mode:'nearest'},
+          scales:{
+            x:{type:'linear', title:{display:true,text:'t (s)'}},
+            y:{title:{display:true,text:'h (m)'}, suggestedMin:0}
+          },
+          plugins:{legend:{display:false}}
+        }
+      });
+    }else{
+      chart.data.datasets = datasets;
+      chart.update();
+    }
+  }
+
+  // ---------- Código EXACTO estilo clase (pero para CONO) con tooltips MEJORADOS ----------
+  const codeEl=document.getElementById('code-block');
+  function renderCode(){
+    const codeHtml = `
+<span class="tt" data-bs-toggle="tooltip" data-bs-title="SciPy proporciona <code>integrate.quad</code> para integración numérica de funciones en 1D">
+from scipy import <b>integrate</b></span>
+import numpy as <b>np</b>
+import matplotlib.pyplot as <b>plt</b>
+
+<span class="tt" data-bs-toggle="tooltip" data-bs-title="<strong>Función principal que implementa el método numérico</strong><br><br>Para un cono perfecto, integramos la relación:<br>\\[ \\frac{dt}{dh} = \\frac{A(h)}{a\\sqrt{2gh}} \\]<br>donde \\[ A(h) = \\pi \\left(\\frac{R_0}{H}\\right)^2 h^2 \\]">
+def h_num_cono(h_0, paso, R0, H, a, g):</span>
+    aux = int(h_0 / paso)
+    t_num = []
+    y_num = []
+    error_num = []
+    y = h_0
+    for i in range(1, aux + 1):
+        <span class="tt" data-bs-toggle="tooltip" data-bs-title="<strong>INTEGRAL PRINCIPAL - Explicación detallada:</strong><br><br>Desarrollando el integrando:<br>\\[ \\frac{A(h)}{a\\sqrt{2gh}} = \\frac{\\pi (R_0/H)^2 h^2}{a\\sqrt{2gh}} \\]<br><br>Simplificando:<br>\\[ = \\frac{\\pi R_0^2}{a H^2 \\sqrt{2g}} \\cdot h^{2 - 0.5} = \\frac{\\pi R_0^2}{a H^2 \\sqrt{2g}} \\cdot h^{1.5} \\]<br><br><strong>Constante C:</strong><br>\\[ C = \\frac{\\pi R_0^2}{a H^2 \\sqrt{2g}} \\]<br>Esta constante agrupa todos los parámetros geométricos y físicos.<br><br><strong>Límites de integración:</strong><br>Integramos desde \\[h_0\\] (altura inicial) hasta \\[y\\] (altura actual)">
+        value, error = integrate.quad(lambda h: (np.pi * R0**2 / (a * H**2 * np.sqrt(2*g))) * h**(1.5), h_0, y)</span>
+        y_num.append(y)
+        t_num.append(value)
+        error_num.append(error)
+        y = y - paso
+    return t_num, y_num, error_num
+
+<span class="tt" data-bs-toggle="tooltip" data-bs-title="<strong>EJECUCIÓN DEL MÉTODO NUMÉRICO</strong><br><br>Generamos una malla descendente en altura:<br>\\[ h = h_0, h_0 - \\text{paso}, h_0 - 2\\cdot\\text{paso}, \\dots \\]<br><br>Para cada altura \\[h\\], calculamos el tiempo \\[t(h)\\] mediante integración numérica.<br><br><strong>Resultado:</strong> Listas de pares \\[(t_\\text{num}, h)\\]">
+t_num, y_num, error = h_num_cono(h_0, 0.1, R0, H, a, g)</span>
+print(error)
+print(t_num)
+
+<span class="tt" data-bs-toggle="tooltip" data-bs-title="<strong>SOLUCIÓN ANALÍTICA EXACTA PARA CONO PERFECTO</strong><br><br>Resolviendo la ecuación diferencial:<br>\\[ A(h)\\frac{dh}{dt} = -a\\sqrt{2gh} \\]<br>\\[ \\pi\\left(\\frac{R_0}{H}\\right)^2 h^2 \\frac{dh}{dt} = -a\\sqrt{2g}\\sqrt{h} \\]<br><br>Separando variables e integrando:<br>\\[ \\int h^{3/2} dh = -C \\int dt \\]<br>donde \\[ C = \\frac{aH^2}{\\pi R_0^2}\\sqrt{2g} \\]<br><br>Solución:<br>\\[ h(t) = \\left( h_0^{5/2} - \\frac{5}{2}C t \\right)^{2/5} \\]">
+def h_cono_anal(h0, a, R0, H, t, g=9.8):</span>
+    t = np.asarray(t)
+    <span class="tt" data-bs-toggle="tooltip" data-bs-title="<strong>CONSTANTE C - Origen físico:</strong><br><br>\\[ C = \\frac{aH^2}{\\pi R_0^2}\\sqrt{2g} \\]<br><br>Esta constante combina:<br>• \\[a\\] - área del orificio<br>• \\[H, R_0\\] - geometría del cono<br>• \\[g\\] - gravedad<br><br>Representa la <em>tasa efectiva de vaciado</em> del cono">
+    C = (a*H**2)/(np.pi*R0**2) * np.sqrt(2*g)</span>
+    <span class="tt" data-bs-toggle="tooltip" data-bs-title="<strong>IMPLEMENTACIÓN DE LA SOLUCIÓN ANALÍTICA</strong><br><br>Para cada tiempo \\[t\\], calculamos:<br>\\[ \\text{inside} = \\max\\left(h_0^{5/2} - \\frac{5}{2}C t, 0\\right) \\]<br>\\[ h(t) = \\text{inside}^{2/5} \\]<br><br>El \\[\\max(\\dots, 0)\\] asegura que la altura nunca sea negativa">
+    inside = np.maximum(h0**2.5 - (5/2)*C*t, 0.0)</span>
+    return inside**(2/5)
+
+<span class="tt" data-bs-toggle="tooltip" data-bs-title="<strong>TIEMPO DE VACIADO COMPLETO - Fórmula analítica</strong><br><br>Cuando \\[h(t) = 0\\]:<br>\\[ 0 = \\left( h_0^{5/2} - \\frac{5}{2}C T \\right)^{2/5} \\]<br>\\[ h_0^{5/2} = \\frac{5}{2}C T \\]<br>\\[ T = \\frac{2}{5C} h_0^{5/2} \\]<br><br>Sustituyendo \\[C\\]:<br>\\[ T = \\frac{2\\pi R_0^2}{5aH^2\\sqrt{2g}} h_0^{2.5} \\]">
+T = (2*np.pi*R0**2/(5*a*H**2*np.sqrt(2*g))) * h_0**2.5</span>
+t_anal = np.linspace(0, T, 600)
+y_anal = h_cono_anal(h_0, a, R0, H, t_anal, g)
+
+<span class="tt" data-bs-toggle="tooltip" data-bs-title="<strong>VISUALIZACIÓN - Comparación métodos</strong><br><br><strong>Línea azul:</strong> Solución analítica exacta<br><strong>Puntos verdes:</strong> Solución numérica por integración<br><br>La concordancia entre ambos métodos valida la implementación numérica">
+plt.plot(t_anal, y_anal)         # línea analítica</span>
+plt.plot(t_num, y_num, '.')      # puntos numéricos (t(h), h)
+plt.ylim(0, 1)
+plt.xlabel("t (s)"); plt.ylabel("h (m)")
+plt.title("Cono perfecto — numérico vs analítico")
+plt.grid(True, alpha=0.3, linestyle='--')
+plt.show()`;
+    codeEl.textContent=''; codeEl.innerHTML=codeHtml;
+    setTimeout(()=>{ initTooltips(); window.MathJax?.typesetPromise?.([codeEl]).catch(()=>{}); },100);
+  }
+
+  // ---------- Eventos ----------
+  document.getElementById('copy').addEventListener('click',()=>{
+    const tmp=document.createElement('textarea'); tmp.value=codeEl.innerText;
+    document.body.appendChild(tmp); tmp.select(); document.execCommand('copy'); document.body.removeChild(tmp);
+    const btn=document.getElementById('copy'); btn.textContent='¡Copiado!'; setTimeout(()=>btn.textContent='Copiar código',1200);
+  });
+
+  document.getElementById('reset').addEventListener('click',()=>{
+    R0El.value=0.4; HEl.value=1.0; aEl.value=0.001; gEl.value=9.8; h0El.value=1.0; pasoEl.value=0.1; showAnal.checked=true;
+    renderCode(); updateChart();
+  });
+
+  [R0El,HEl,aEl,gEl,h0El,pasoEl,showAnal].forEach(el=>{
+    el.addEventListener('input',updateChart);
+    el.addEventListener('change',updateChart);
+  });
+
+  // Modal → render LaTeX al abrir
+  const modal=document.getElementById('explicacionModal');
+  modal?.addEventListener('shown.bs.modal',()=>{ window.MathJax?.typesetPromise?.([modal]).catch(()=>{}); });
+
+  // init
+  initTooltips(); renderCode(); updateChart();
+});
+</script>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+  <h1 class="h3 mb-2">Cono perfecto — método numérico (integral \(t(h)\))</h1>
+  <p class="text-muted mb-3">
+    Construimos \((t_\text{num},h)\) integrando
+    \( \displaystyle \frac{dt}{dh}=\frac{A(h)}{a\sqrt{2gh}} \)
+    con <code>integrate.quad</code> (aquí emulado) y comparamos contra la solución analítica del cono perfecto.
+    <span class="tt" data-bs-toggle="tooltip" data-bs-title="<strong>MÉTODO NUMÉRICO EXPLICADO</strong><br><br>En lugar de resolver \\[h(t)\\] directamente, calculamos \\[t(h)\\] integrando la relación inversa.<br><br>Ventaja: Evita problemas numéricos cuando \\[h \\to 0\\]">
+    💡 Explicación completa
+    </span>
+  </p>
+
+  <div class="row g-3 align-items-stretch mb-4">
+    <div class="col-lg-4">
+      <div class="card h-100"><div class="card-body">
+        <h6 class="text-secondary mb-3">Parámetros</h6>
+        <div class="param-grid">
+          <div><label class="form-label">R₀ (m) — radio de la boca</label><input type="number" step="any" class="form-control" id="paramR0" value="0.4"></div>
+          <div><label class="form-label">H (m) — altura total</label><input type="number" step="any" class="form-control" id="paramH" value="1.0"></div>
+          <div><label class="form-label">a (m²)</label><input type="number" step="any" class="form-control" id="parama" value="0.001"></div>
+          <div><label class="form-label">g (m/s²)</label><input type="number" step="any" class="form-control" id="paramg" value="9.8"></div>
+          <div><label class="form-label">h₀ (m)</label><input type="number" step="any" class="form-control" id="paramh0" value="1.0"></div>
+          <div class="full">
+            <label class="form-label">paso (m) — altura descendente</label>
+            <input type="number" step="any" class="form-control" id="paramPaso" value="0.1">
+          </div>
+        </div>
+
+        <div class="mt-3 d-flex justify-content-between align-items-center">
+          <button class="btn btn-outline-secondary btn-sm" id="reset" type="button">Restablecer</button>
+          <div class="text-end small">
+            <div><span class="badge text-bg-success">\(T_{\text{num}}\) = <span id="tvacNum">—</span></span></div>
+            <div class="mt-1"><span class="badge text-bg-primary">\(T_{\text{an}}\) = <span id="tvacAn">—</span></span></div>
+          </div>
+        </div>
+
+        <hr class="my-3">
+        <label class="legend-pill mb-2">
+          <span class="dot" style="background:#3b82f6"></span>
+          <input class="form-check-input ms-1 me-2" type="checkbox" id="toggleAnalitica" checked>
+          <span>Comparar con <strong>analítica (cono)</strong></span>
+        </label>
+        <div class="small text-muted">Puntos verdes: numérico \((t_\text{num},h)\). Línea azul: analítica del cono perfecto.</div>
+      </div></div>
+    </div>
+
+    <div class="col-lg-8">
+      <div class="card h-100"><div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h6 class="text-secondary mb-0">Curva \(h(t)\)</h6>
+          <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#explicacionModal">
+            Ver explicación completa
+          </button>
+        </div>
+        <canvas id="chart" height="120"></canvas>
+      </div></div>
+    </div>
+  </div>
+
+  <!-- Tabla de errores -->
+  <div class="card mb-4">
+    <div class="card-body">
+      <h6 class="text-secondary mb-2">Tabla de comparación \(t_\text{num}\) vs \(t_\text{an}\)</h6>
+      <div class="table-responsive">
+        <table class="table table-sm align-middle">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>h (m)</th>
+              <th>t<sub>num</sub> (s)</th>
+              <th>t<sub>an</sub> (s)</th>
+              <th>|Δt| (s)</th>
+            </tr>
+          </thead>
+          <tbody id="tbodyErr"></tbody>
+        </table>
+      </div>
+      <div class="small text-muted">Si desactivas "Comparar con analítica", la columna de error queda en "—".</div>
+    </div>
+  </div>
+
+  <!-- Código EXACTO estilo clase (adaptado a cono) -->
+  <div class="code-wrap mb-4">
+    <button class="copy-btn" id="copy" type="button">Copiar código</button>
+    <pre class="code"><code id="code-block"></code></pre>
+  </div>
+</div>
+
+<!-- ===== Modal de explicación ===== -->
+<div class="modal fade" id="explicacionModal" tabindex="-1" aria-labelledby="explicacionLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="explicacionLabel">Explicación completa del método numérico para cono perfecto</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        <h6>1. Fundamentos Físicos</h6>
+        <p><strong>Ecuación de Torricelli:</strong> \( v = \sqrt{2gh} \)</p>
+        <p><strong>Caudal de salida:</strong> \( Q = a \cdot v = a\sqrt{2gh} \)</p>
+        
+        <h6>2. Geometría del Cono</h6>
+        <p>Radio a altura \(h\): \( R(h) = \dfrac{R_0}{H}h \)</p>
+        <p>Área transversal: \( A(h) = \pi [R(h)]^2 = \pi \left(\dfrac{R_0}{H}\right)^2 h^2 \)</p>
+        
+        <h6>3. Ecuación Diferencial</h6>
+        <p>Por conservación de masa: \( A(h)\dfrac{dh}{dt} = -Q \)</p>
+        <p>\[ \pi \left(\dfrac{R_0}{H}\right)^2 h^2 \dfrac{dh}{dt} = -a\sqrt{2gh} \]</p>
+        
+        <h6>4. Método Numérico (Integral \(t(h)\))</h6>
+        <p>Reescribimos: \( \dfrac{dt}{dh} = -\dfrac{A(h)}{a\sqrt{2gh}} \)</p>
+        <p>Para \(h\) descendente: \( t(h) = \displaystyle\int_{h_0}^{h} \dfrac{A(\xi)}{a\sqrt{2g\xi}} d\xi \)</p>
+        
+        <h6>5. Constantes y Simplificaciones</h6>
+        <p><strong>Constante C (numérica):</strong> \( C_{\text{num}} = \dfrac{\pi R_0^2}{a H^2 \sqrt{2g}} \)</p>
+        <p><strong>Constante C (analítica):</strong> \( C_{\text{an}} = \dfrac{a H^2}{\pi R_0^2} \sqrt{2g} \)</p>
+        <p>Nota: \( C_{\text{num}} \cdot C_{\text{an}} = 1 \)</p>
+        
+        <h6>6. Algoritmo Implementado</h6>
+        <ol>
+          <li>Crear malla descendente: \( h = h_0, h_0-\text{paso}, \dots \)</li>
+          <li>Para cada \(h\), calcular \( t(h) = C_{\text{num}} \displaystyle\int_{h_0}^{h} \xi^{1.5} d\xi \)</li>
+          <li>Guardar pares \((t(h), h)\)</li>
+          <li>Comparar con solución analítica</li>
+        </ol>
+        
+        <div class="alert alert-info small">
+          <strong>Ventaja del método:</strong> Al integrar \(t(h)\) en lugar de resolver \(h(t)\), evitamos problemas numéricos cuando \(h \to 0\).
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

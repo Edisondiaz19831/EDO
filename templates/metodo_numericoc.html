@@ -1,0 +1,389 @@
+{% extends "base.html" %}
+{% block title %}Métodos numéricos — Interactivo (versión clase){% endblock %}
+
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+<style>
+  .code-wrap{background:#0b1020;color:#e5e7eb;border-radius:10px;padding:1rem 1.25rem;border:1px solid #111827;overflow-x:auto;font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;line-height:1.45;position:relative}
+  .tt{cursor:help;text-decoration:underline dotted;border-bottom:1px dotted #60a5fa;color:#93c5fd}
+  .tt:hover{color:#bfdbfe}
+  .param-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+  .param-grid .full{grid-column:1/-1}
+  .copy-btn{position:absolute;top:8px;right:8px;font-size:.85rem;background:#111827;color:#e5e7eb;border:1px solid #374151;border-radius:6px;padding:.25rem .5rem}
+  .legend-pill{display:inline-flex;align-items:center;gap:.4rem;padding:.25rem .5rem;border-radius:9999px;border:1px solid #e5e7eb;background:#f8fafc;font-size:.85rem}
+  .dot{width:.7rem;height:.7rem;border-radius:50%;display:inline-block}
+  .table-sm td,.table-sm th{padding:.35rem .5rem}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  // ---------- Tooltips + LaTeX ----------
+  const initTooltips = () => {
+    document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el=>{
+      new bootstrap.Tooltip(el,{html:true,trigger:'hover focus',sanitize:false,container:'body',delay:{show:250,hide:100}});
+      el.addEventListener('shown.bs.tooltip',()=>{
+        const id=el.getAttribute('aria-describedby'); const tip=id&&document.getElementById(id);
+        if(tip && window.MathJax?.typesetPromise){ const inner=tip.querySelector('.tooltip-inner'); if(inner) MathJax.typesetPromise([inner]).catch(()=>{}); }
+      });
+    });
+  };
+
+  // ---------- Inputs ----------
+  const AEl  = document.getElementById('paramA');
+  const aEl  = document.getElementById('parama');
+  const gEl  = document.getElementById('paramg');
+  const h0El = document.getElementById('paramh0');
+  const pasoEl = document.getElementById('paramPaso');
+  const showAnal = document.getElementById('toggleAnalitica');
+  const tvacNumOut = document.getElementById('tvacNum');
+  const tvacAnOut  = document.getElementById('tvacAn');
+  const tbodyErr   = document.getElementById('tbodyErr');
+
+  // ---------- Integrando t(h) como en clase ----------
+  // dt/dh = - (A/a) * sqrt((1 - a^2/A^2)/(2 g h))
+  function integrand(A,a,g,h){
+    if(h<=0) return 0;
+    const beta = Math.max(0, 1 - (a*a)/(A*A));  // evita raíz negativa
+    return - (A/a) * Math.sqrt( beta / (2*g*h) );
+  }
+
+  // Simpson adaptativo 1D
+  function quadSimpson(f, a, b, tol=1e-8, maxDepth=12){
+    const sgn = b>=a ? 1 : -1;
+    const A = Math.min(a,b), B = Math.max(a,b);
+    function S(f, x0, x2){ const x1=0.5*(x0+x2); return (x2-x0)*(f(x0)+4*f(x1)+f(x2))/6; }
+    function adapt(f, x0, x2, S0, depth){
+      const x1=0.5*(x0+x2), Sleft=S(f,x0,x1), Sright=S(f,x1,x2);
+      const err = Math.abs(Sleft+Sright - S0);
+      if(err < 15*tol || depth<=0) return Sleft+Sright + (Sleft+Sright - S0)/15;
+      return adapt(f,x0,x1,Sleft,depth-1) + adapt(f,x1,x2,Sright,depth-1);
+    }
+    const S0=S(f,A,B);
+    return sgn*adapt(f,A,B,S0,maxDepth);
+  }
+
+  // Construye (t_num, y_num) como en el bucle de clase
+  function seriesNumerica(h0, paso, A, a, g){
+    const N = Math.max(1, Math.floor(h0/Math.max(paso,1e-12)));
+    const t_num=[], y_num=[];
+    let y=Math.max(0,h0);
+    for(let i=1;i<=N;i++){
+      const value = quadSimpson(h=>integrand(A,a,g,h), h0, y); // integra desde h0 hasta y
+      t_num.push(value);
+      y_num.push(y);
+      y = Math.max(0, y - paso); // nunca < 0
+    }
+    // rebasea t para que arranque en 0
+    const t0 = t_num[0] || 0;
+    const tShift = t_num.map(v=>v - t0);
+    return {t:tShift, y:y_num};
+  }
+
+  // Analítica para comparar (opcional) con el mismo factor (1 - a^2/A^2)
+  function analytic(A,a,g,h0,N=800){
+    const beta = Math.max(0, 1 - (a*a)/(A*A));
+    const k=(a/(2*A))*Math.sqrt(2*g) / Math.sqrt(Math.max(beta,1e-16));
+    const tVac=(2*A/a)*Math.sqrt(h0/(2*g)) * Math.sqrt(beta);
+    const t=Array.from({length:N},(_,i)=>i*tVac/(N-1));
+    const y=t.map(tt => { const sh=Math.max(Math.sqrt(h0) - k*tt,0); return sh*sh; });
+    return {t,y,tVac};
+  }
+
+  // ---------- Chart ----------
+  const ctx=document.getElementById('chart').getContext('2d');
+  let chart;
+
+  function fillErrorTable(num, an){
+    tbodyErr.innerHTML = '';
+    for(let i=0;i<num.t.length;i++){
+      const h = num.y[i];
+      const tnum = num.t[i];
+      let tan = null, err = '—';
+      if(an){
+        // toma t_an por interpolación de la analítica en h
+        // buscamos t tal que y_an(t) ≈ h. Usamos búsqueda lineal simple.
+        const ya = an.y;
+        let tInterp = null;
+        for(let j=1;j<ya.length;j++){
+          if((ya[j-1]-h)*(ya[j]-h)<=0){ // cruce
+            const f1 = ya[j-1]-h, f2 = ya[j]-h;
+            const fr = Math.abs(f1)/(Math.abs(f1)+Math.abs(f2));
+            tInterp = an.t[j-1] + fr*(an.t[j]-an.t[j-1]);
+            break;
+          }
+        }
+        if(tInterp==null) tInterp = an.t[an.t.length-1];
+        tan = tInterp;
+        err = Math.abs(tnum - tan);
+      }
+      const tr=document.createElement('tr');
+      tr.innerHTML = `
+        <td class="text-muted">${i+1}</td>
+        <td>${h.toFixed(4)}</td>
+        <td>${tnum.toFixed(4)}</td>
+        <td>${tan!=null ? tan.toFixed(4) : '—'}</td>
+        <td>${tan!=null ? err.toExponential(3) : '—'}</td>
+      `;
+      tbodyErr.appendChild(tr);
+    }
+  }
+
+  function updateChart(){
+    // sanity de parámetros
+    const A = Math.max(1e-12, parseFloat(AEl.value));
+    const a = Math.max(1e-12, parseFloat(aEl.value));
+    const g = Math.max(1e-12, parseFloat(gEl.value));
+    const h0 = Math.max(0, parseFloat(h0El.value));
+    const paso = Math.max(1e-6, Math.min(parseFloat(pasoEl.value), h0)); // paso ≤ h0
+
+    const num = seriesNumerica(h0, paso, A, a, g);
+    const numPts = num.t.map((ti,i)=>({x:ti,y:num.y[i]}));
+    let datasets = [{
+      label:'Numérica (quad) — puntos',
+      data:numPts, parsing:false,
+      showLine:false, pointRadius:3.2, pointHoverRadius:4,
+      borderColor:'#10b981', backgroundColor:'#10b981'
+    }];
+
+    // estimar t_vac_num por ajuste lineal a los 2 últimos puntos
+    let tVacNum = num.t[num.t.length-1];
+    if(num.y.length>=2){
+      const h1=num.y[num.y.length-2], h2=num.y[num.y.length-1];
+      const t1=num.t[num.t.length-2], t2=num.t[num.t.length-1];
+      if(h1>0 && h2>=0 && h1!==h2){ // interpola 0 entre h1 y h2
+        const frac = h1/(h1-h2);
+        tVacNum = t1 + frac*(t2-t1);
+      }
+    }
+    tvacNumOut.textContent = isFinite(tVacNum) ? tVacNum.toFixed(4)+' s' : '—';
+
+    let an = null;
+    if(showAnal.checked){
+      an = analytic(A,a,g,h0);
+      const anPts = an.t.map((ti,i)=>({x:ti,y:an.y[i]}));
+      datasets.push({
+        label:'Analítica — línea',
+        data:anPts, parsing:false,
+        borderColor:'#3b82f6', backgroundColor:'rgba(59,130,246,.06)',
+        borderWidth:2, tension:0.1, fill:false, pointRadius:0
+      });
+      tvacAnOut.textContent = an.t[an.t.length-1].toFixed(4)+' s';
+    } else {
+      tvacAnOut.textContent = '—';
+    }
+
+    // tabla de errores
+    fillErrorTable(num, an);
+
+    if(!chart){
+      chart = new Chart(ctx,{
+        type:'line',
+        data:{datasets},
+        options:{
+          parsing:false, animation:{duration:0}, responsive:true,
+          interaction:{intersect:false,mode:'nearest'},
+          scales:{
+            x:{type:'linear', title:{display:true,text:'t (s)'}},
+            y:{title:{display:true,text:'h (m)'}, suggestedMin:0}
+          },
+          plugins:{legend:{display:false}}
+        }
+      });
+    }else{
+      chart.data.datasets = datasets;
+      chart.update();
+    }
+  }
+
+  // ---------- Código EXACTO de clase con tooltips ----------
+  const codeEl=document.getElementById('code-block');
+  function renderCode(){
+    const codeHtml = `
+<span class="tt" data-bs-toggle="tooltip" data-bs-title="Usamos SciPy para integrar una función en 1D: \\(\\texttt{integrate.quad}\\)">
+from scipy import <b>integrate</b></span>
+import numpy as <b>np</b>
+import matplotlib.pyplot as <b>plt</b>
+
+<span class="tt" data-bs-toggle="tooltip" data-bs-title="Función que construye (t_num, y_num) integrando \\(\\tfrac{dt}{dh}\\) desde \\(h_0\\) hasta \\(y\\) con un paso de altura 'paso'">
+def h_num(h_0, paso, A, a):</span>
+    aux = int(h_0 / paso)
+    t_num = []
+    y_num = []
+    error_num = []
+    y = h_0
+    for i in range(1, aux + 1):
+        <span class="tt" data-bs-toggle="tooltip" data-bs-title="\\(\\frac{dt}{dh} = -\\frac{A}{a}\\sqrt{\\frac{1 - a^2/A^2}{2 g\\, y}}\\). Se integra desde \\(h_0\\) hasta \\(y\\).">
+        value, error = integrate.quad(lambda y: -(A / a) * np.sqrt((1 - a**2 / A**2) / (2 * g * y)), h_0, y)</span>
+        y_num.append(y)
+        t_num.append(value)
+        error_num.append(error)
+        y = y - paso
+    return t_num, y_num, error_num
+
+<span class="tt" data-bs-toggle="tooltip" data-bs-title="Ejecutamos la integración con paso en altura de 0.1 m (como en clase)">
+t_num, y_num, error = h_num(h_0, 0.1, A, a)</span>
+print(error)
+print(t_num)
+
+<span class="tt" data-bs-toggle="tooltip" data-bs-title="Curva analítica h(t) para comparar (línea)">
+t_anal = np.arange(0, 900, 1)
+y_anal = h_anal(h_0, a, A, t_anal)</span>
+plt.plot(t_anal, y_anal)
+<span class="tt" data-bs-toggle="tooltip" data-bs-title="Puntos numéricos: \\((t_{num}, h)\\) obtenidos con \\(\\texttt{integrate.quad}\\)">
+plt.plot(t_num, y_num, '.')</span>
+plt.ylim(0, 1)
+plt.xlim(0, 900)
+plt.show()`;
+    codeEl.textContent=''; codeEl.innerHTML=codeHtml;
+    setTimeout(()=>{ initTooltips(); window.MathJax?.typesetPromise?.([codeEl]).catch(()=>{}); },100);
+  }
+
+  // ---------- Eventos ----------
+  document.getElementById('copy').addEventListener('click',()=>{
+    const tmp=document.createElement('textarea'); tmp.value=codeEl.innerText;
+    document.body.appendChild(tmp); tmp.select(); document.execCommand('copy'); document.body.removeChild(tmp);
+    const btn=document.getElementById('copy'); btn.textContent='¡Copiado!'; setTimeout(()=>btn.textContent='Copiar código',1200);
+  });
+
+  document.getElementById('reset').addEventListener('click',()=>{
+    AEl.value=2.0; aEl.value=0.001; gEl.value=9.8; h0El.value=1.0; pasoEl.value=0.1; showAnal.checked=true;
+    renderCode(); updateChart();
+  });
+
+  [AEl,aEl,gEl,h0El,pasoEl,showAnal].forEach(el=>{
+    el.addEventListener('input',updateChart);
+    el.addEventListener('change',updateChart);
+  });
+
+  // Modal → render LaTeX al abrir
+  const modal=document.getElementById('explicacionModal');
+  modal?.addEventListener('shown.bs.modal',()=>{ window.MathJax?.typesetPromise?.([modal]).catch(()=>{}); });
+
+  // init
+  initTooltips(); renderCode(); updateChart();
+});
+</script>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+  <h1 class="h3 mb-2">Métodos numéricos — versión de clase (integral \(dt/dh\))</h1>
+  <p class="text-muted mb-3">
+    Reproducimos el enfoque de clase: construir \((t_\text{num},h)\) integrando \( \dfrac{dt}{dh} \) con <code>integrate.quad</code>
+    (aquí emulado en el navegador) y comparar con la solución analítica.
+  </p>
+
+  <div class="row g-3 align-items-stretch mb-4">
+    <div class="col-lg-4">
+      <div class="card h-100"><div class="card-body">
+        <h6 class="text-secondary mb-3">Parámetros</h6>
+        <div class="param-grid">
+          <div><label class="form-label">A (m²)</label><input type="number" step="any" class="form-control" id="paramA" value="2.0"></div>
+          <div><label class="form-label">a (m²)</label><input type="number" step="any" class="form-control" id="parama" value="0.001"></div>
+          <div><label class="form-label">g (m/s²)</label><input type="number" step="any" class="form-control" id="paramg" value="9.8"></div>
+          <div><label class="form-label">h₀ (m)</label><input type="number" step="any" class="form-control" id="paramh0" value="1.0"></div>
+          <div class="full">
+            <label class="form-label">paso (m) — altura descendente</label>
+            <input type="number" step="any" class="form-control" id="paramPaso" value="0.1">
+          </div>
+        </div>
+
+        <div class="mt-3 d-flex justify-content-between align-items-center">
+          <button class="btn btn-outline-secondary btn-sm" id="reset" type="button">Restablecer</button>
+          <div class="text-end small">
+            <div><span class="badge text-bg-success">\(t_{\text{vac}}^{\text{num}}\) = <span id="tvacNum">—</span></span></div>
+            <div class="mt-1"><span class="badge text-bg-primary">\(t_{\text{vac}}^{\text{an}}\) = <span id="tvacAn">—</span></span></div>
+          </div>
+        </div>
+
+        <hr class="my-3">
+        <label class="legend-pill mb-2">
+          <span class="dot" style="background:#3b82f6"></span>
+          <input class="form-check-input ms-1 me-2" type="checkbox" id="toggleAnalitica" checked>
+          <span>Comparar con <strong>analítica</strong></span>
+        </label>
+        <div class="small text-muted">Los puntos verdes son la curva numérica de clase; la línea azul es la analítica.</div>
+      </div></div>
+    </div>
+
+    <div class="col-lg-8">
+      <div class="card h-100"><div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h6 class="text-secondary mb-0">Curva \(h(t)\)</h6>
+          <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#explicacionModal">
+            Ver explicación
+          </button>
+        </div>
+        <canvas id="chart" height="120"></canvas>
+      </div></div>
+    </div>
+  </div>
+
+  <!-- Tabla de errores -->
+  <div class="card mb-4">
+    <div class="card-body">
+      <h6 class="text-secondary mb-2">Tabla de comparación \(t_\text{num}\) vs \(t_\text{an}\)</h6>
+      <div class="table-responsive">
+        <table class="table table-sm align-middle">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>h (m)</th>
+              <th>t<sub>num</sub> (s)</th>
+              <th>t<sub>an</sub> (s)</th>
+              <th>|Δt| (s)</th>
+            </tr>
+          </thead>
+          <tbody id="tbodyErr"></tbody>
+        </table>
+      </div>
+      <div class="small text-muted">Si desactivas la casilla “Comparar con analítica”, la columna de error queda en “—”.</div>
+    </div>
+  </div>
+
+  <!-- Código EXACTO de clase con tooltips -->
+  <div class="code-wrap mb-4">
+    <button class="copy-btn" id="copy" type="button">Copiar código</button>
+    <pre class="code"><code id="code-block"></code></pre>
+  </div>
+</div>
+
+<!-- ===== Modal de explicación ===== -->
+<div class="modal fade" id="explicacionModal" tabindex="-1" aria-labelledby="explicacionLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="explicacionLabel">Qué hace el código numérico y por qué</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        <ol class="mb-3">
+          <li><strong>Modelo</strong>:
+            \(v=\sqrt{2gh}\) (Torricelli), \(Q=a\,v\), \(A\,\dfrac{dh}{dt}=-Q\) ⇒
+            \(\dfrac{dh}{dt}= -\dfrac{a}{A}\sqrt{2gh}\).</li>
+          <li><strong>Cambio de variable</strong>:
+            integrando en altura,
+            $$\frac{dt}{dh}=\frac{1}{dh/dt} \;=\; -\,\frac{A}{a}\,\sqrt{\frac{\,1-\frac{a^2}{A^2}\,}{\,2gh\,}}.$$
+            (el factor \(\sqrt{1-a^2/A^2}\) es el mismo que aparece en tu código: corrige el flujo efectivo).</li>
+          <li><strong>Idea del bucle</strong>:
+            para una malla descendente \(h_0,\,h_0-\text{paso},\,\dots\),
+            el código hace
+$$t(h)=\int_{h_0}^{h}\frac{dt}{dh}\;dh$$
+(con <code>integrate.quad</code>),
+            guarda el par \((t(h),\,h)\) y baja a la siguiente altura.</li>
+          <li><strong>Gráfica</strong>:
+            se dibuja la línea analítica \(h(t)\) y encima los puntos numéricos \((t_\text{num},h)\) —igual que en tu plot de clase.</li>
+        </ol>
+        <div class="alert alert-secondary small">
+          <strong>Lectura de \(t_{\text{vac}}\):</strong> cuando \(h\to 0\) la integral diverge, por eso el bucle no llega exactamente a 0; se estima el
+          \(t_\text{vac}\) por interpolación lineal de los dos últimos puntos \((t_1,h_1)\), \((t_2,h_2)\).
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

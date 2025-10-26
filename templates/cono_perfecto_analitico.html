@@ -1,0 +1,450 @@
+{% extends "base.html" %}
+{% block title %}Cono perfecto — método analítico{% endblock %}
+
+{% block head %}
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<!-- MathJax para renderizado LaTeX -->
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+<style>
+  .code-wrap{
+    background:#0b1020;color:#e5e7eb;border-radius:10px;padding:1rem 1.25rem;
+    border:1px solid #111827;overflow-x:auto;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    line-height:1.45; position: relative;
+  }
+  .tt{
+    cursor:help; text-decoration: underline dotted;
+    border-bottom: 1px dotted #60a5fa; color: #93c5fd;
+  }
+  .tt:hover { color: #bfdbfe; }
+  .lead-note{ font-size:.95rem; color:#4b5563; }
+  .param-grid{ display:grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap:12px; }
+  .param-grid .full{ grid-column: 1 / -1; }
+  .copy-btn{
+    position:absolute; top:8px; right:8px; font-size:.85rem;
+    background:#111827; color:#e5e7eb; border:1px solid #374151; border-radius:6px; padding:.25rem .5rem;
+  }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  // ---------- Tooltips con LaTeX ----------
+  const initTooltips = () => {
+    const tips = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    tips.forEach((el) => {
+      new bootstrap.Tooltip(el, {
+        html: true,
+        trigger: 'hover focus',
+        sanitize: false,
+        container: 'body',
+        customClass: 'math-tooltip',
+        delay: { show: 300, hide: 100 }
+      });
+      el.addEventListener('shown.bs.tooltip', () => {
+        const id = el.getAttribute('aria-describedby');
+        const tip = id && document.getElementById(id);
+        if (tip && window.MathJax && MathJax.typesetPromise) {
+          const inner = tip.querySelector('.tooltip-inner');
+          if (inner) MathJax.typesetPromise([inner]).catch(() => {});
+        }
+      });
+    });
+  };
+
+  // ---------- Parámetros (inputs) ----------
+  const aEl  = document.getElementById('parama');
+  const gEl  = document.getElementById('paramg');
+  const h0El = document.getElementById('paramh0');
+  const R0El = document.getElementById('paramR0');
+  const HEl  = document.getElementById('paramH');
+  const nEl  = document.getElementById('paramN');
+  const tvacOut = document.getElementById('tvac');
+
+  // ---------- Modelo analítico (cono perfecto) ----------
+  function computeSeries(a, g, h0, R0, H, N=600){
+    const C = (a * H*H) / (Math.PI * R0*R0) * Math.sqrt(2*g);
+    const T = (2/(5*C)) * Math.pow(h0, 2.5);
+    const t = [], y = [];
+    for (let i=0; i<N; i++){
+      const ti = i * T / (N-1);
+      const inside = Math.max(Math.pow(h0, 2.5) - (5/2)*C*ti, 0);
+      const hi = Math.pow(inside, 2/5);
+      t.push(ti);
+      y.push(hi);
+    }
+    return {t, y, T};
+  }
+
+  // ---------- Gráfico ----------
+  const ctx = document.getElementById('chart').getContext('2d');
+  let chart;
+
+  function updateChart(a, g, h0, R0, H, N){
+    const {t, y, T} = computeSeries(a, g, h0, R0, H, N);
+    tvacOut.textContent = T.toFixed(4) + ' s';
+
+    const points = t.map((ti, i) => ({ x: ti, y: y[i] }));
+
+    if (!chart){
+      chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          datasets: [{
+            label: 'h(t)',
+            data: points,
+            borderColor: '#3b82f6',
+            backgroundColor: 'rgba(59,130,246,0.1)',
+            borderWidth: 2,
+            tension: 0.1,
+            fill: true,
+            pointRadius: 0,
+            pointHoverRadius: 4
+          }]
+        },
+        options: {
+          parsing: false,
+          animation: { duration: 0 },
+          responsive: true,
+          interaction: { intersect: false, mode: 'index' },
+          scales: {
+            x: {
+              type: 'linear',
+              title: { display: true, text: 't (s)', color: '#6b7280', font: { size: 12 } },
+              grid: { color: 'rgba(0,0,0,0.06)', drawBorder: false },
+              ticks: { color: '#9ca3af', maxTicksLimit: 8 }
+            },
+            y: {
+              title: { display: true, text: 'h(t) (m)', color: '#6b7280', font: { size: 12 } },
+              suggestedMin: 0,
+              suggestedMax: Math.max(1, h0),
+              grid: { color: 'rgba(0,0,0,0.06)', drawBorder: false },
+              ticks: { color: '#9ca3af', maxTicksLimit: 6 }
+            }
+          },
+          plugins: { legend: { display: false } }
+        }
+      });
+    } else {
+      chart.data.datasets[0].data = points;
+      chart.options.scales.y.suggestedMax = Math.max(1, h0);
+      chart.update();
+    }
+  }
+
+  // ---------- Código Python "vivo" con tooltips MEJORADOS ----------
+  const codeEl = document.getElementById('code-block');
+
+  function renderCode(a, g, h0, R0, H){
+    const a_txt = a.toExponential(6);
+    const g_txt = g.toPrecision(6);
+    const h0_txt = h0.toPrecision(6);
+    const R0_txt = R0.toPrecision(6);
+    const H_txt  = H.toPrecision(6);
+
+    const codeHtml = `
+<span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+  data-bs-title="<strong>NUMPY - CÁLCULO NUMÉRICO</strong><br><br>Librería fundamental para operaciones matemáticas y manejo de arrays en Python.<br><br>Nos permite trabajar con vectores de tiempo y evaluar funciones vectorialmente.">
+import numpy as <b>np</b></span>
+<span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+  data-bs-title="<strong>MATPLOTLIB - VISUALIZACIÓN</strong><br><br>Librería estándar para creación de gráficos y visualizaciones científicas.<br><br>Usaremos <code>pyplot</code> para generar el gráfico de h(t) vs t.">
+import matplotlib.pyplot as <b>plt</b></span>
+
+# parámetros del sistema (cono perfecto)
+<span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+  data-bs-title="<strong>ÁREA DEL ORIFICIO (a)</strong><br><br>\\[ a = ${a}\\,\\mathrm{m}^2 \\]<br><br>Representa el área de la sección de salida del fluido.<br><br><strong>Relación física:</strong> Determina el caudal de salida según Torricelli:<br>\\[ Q = a \\cdot v = a \\sqrt{2gh} \\]">
+a   = ${a_txt}   # m²</span>
+<span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+  data-bs-title="<strong>ACELERACIÓN GRAVITACIONAL (g)</strong><br><br>\\[ g = ${g}\\,\\mathrm{m/s^2} \\]<br><br>Aceleración debida a la gravedad que impulsa el flujo.<br><br><strong>En Torricelli:</strong> \\[ v = \\sqrt{2gh} \\]<br>La velocidad de salida depende de la raíz cuadrada de g.">
+g   = ${g_txt}   # m/s²</span>
+<span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+  data-bs-title="<strong>ALTURA INICIAL (h₀)</strong><br><br>\\[ h_0 = ${h0}\\,\\mathrm{m} \\]<br><br>Altura inicial del fluido en el cono.<br><br><strong>Importancia:</strong> Aparece elevada a 2.5 en la solución, lo que refleja la no-linealidad del sistema.">
+h0  = ${h0_txt}  # m</span>
+<span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+  data-bs-title="<strong>RADIO DE LA BOCA (R₀)</strong><br><br>\\[ R_0 = ${R0}\\,\\mathrm{m} \\]<br><br>Radio del cono a la altura H (parte superior).<br><br><strong>En geometría:</strong> El radio a cualquier altura h es:<br>\\[ R(h) = \\frac{R_0}{H} h \\]">
+R0  = ${R0_txt}  # m</span>
+<span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+  data-bs-title="<strong>ALTURA TOTAL DEL CONO (H)</strong><br><br>\\[ H = ${H}\\,\\mathrm{m} \\]<br><br>Altura total del cono desde el vértice hasta la boca.<br><br><strong>Relación geométrica:</strong> Define la pendiente del cono:<br>\\[ \\frac{R_0}{H} = \\text{pendiente del radio} \\]">
+H   = ${H_txt}   # m</span>
+
+<span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+  data-bs-title="<strong>FUNCIÓN DE LA SOLUCIÓN ANALÍTICA</strong><br><br><strong>Geometría del cono:</strong><br>\\[ A(h) = \\pi \\left(\\frac{R_0}{H}\\right)^2 h^2 \\]<br><br><strong>Constante C (tasa de vaciado):</strong><br>\\[ C = \\frac{aH^2}{\\pi R_0^2}\\sqrt{2g} \\]<br><br><strong>Origen de C:</strong> Surge al separar variables en la ecuación diferencial:<br>\\[ A(h) \\frac{dh}{dt} = -a\\sqrt{2gh} \\]">
+def h_cono_anal(h0, a, R0, H, t, g=9.8):</span>
+    t = np.asarray(t)
+    <span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+      data-bs-title="<strong>CONSTANTE C - EXPLICACIÓN DETALLADA</strong><br><br>\\[ C = \\frac{aH^2}{\\pi R_0^2}\\sqrt{2g} \\]<br><br><strong>Desglose de términos:</strong><br>• \\[a\\] - área del orificio (controla el caudal)<br>• \\[H^2/R_0^2\\] - relación geométrica del cono<br>• \\[\\sqrt{2g}\\] - factor de Torricelli para la velocidad<br><br><strong>Significado físico:</strong> C representa la <em>tasa efectiva de vaciado</em> del cono. Un C mayor significa vaciado más rápido.">
+    C = (a*H**2)/(np.pi*R0**2) * np.sqrt(2*g)</span>
+    <span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+      data-bs-title="<strong>NÚCLEO DE LA SOLUCIÓN ANALÍTICA</strong><br><br>\\[ \\text{inside} = h_0^{5/2} - \\frac{5}{2}C t \\]<br><br><strong>Origen matemático:</strong> Viene de integrar la ecuación diferencial:<br>\\[ \\int h^{3/2} dh = -C \\int dt \\]<br>\\[ \\frac{2}{5}h^{5/2} = -C t + \\text{constante} \\]<br><br>El <code>np.maximum(..., 0)</code> asegura que la altura nunca sea negativa.">
+    inside = np.maximum(h0**2.5 - (5/2)*C*t, 0.0)</span>
+    <span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+      data-bs-title="<strong>FORMA FINAL DE LA SOLUCIÓN</strong><br><br>\\[ h(t) = \\left[ h_0^{5/2} - \\frac{5}{2}C t \\right]^{2/5} \\]<br><br><strong>Explicación de exponentes:</strong><br>• <strong>5/2:</strong> Viene de integrar h³/² dh<br>• <strong>2/5:</strong> Es el inverso de 5/2 para despejar h(t)<br><br>Esta es la <em>solución exacta cerrada</em> para el cono perfecto.">
+    return inside**(2/5)</span>
+
+<span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+  data-bs-title="<strong>TIEMPO DE VACIADO COMPLETO - DEDUCCIÓN</strong><br><br>Cuando \\[h(T) = 0\\]:<br>\\[ 0 = \\left( h_0^{5/2} - \\frac{5}{2}C T \\right)^{2/5} \\]<br>\\[ h_0^{5/2} = \\frac{5}{2}C T \\]<br>\\[ T = \\frac{2}{5C} h_0^{5/2} \\]<br><br><strong>Sustituyendo C:</strong><br>\\[ T = \\frac{2\\pi R_0^2}{5aH^2\\sqrt{2g}} h_0^{2.5} \\]<br><br>Nota: \\[h_0^{5/2} = h_0^{2.5}\\]]">
+T = (2*np.pi*R0**2/(5*a*H**2*np.sqrt(2*g))) * h0**2.5</span>
+print("T ≈", T, "s")
+
+# malla temporal y evaluación
+<span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+  data-bs-title="<strong>CREACIÓN DE MALLA TEMPORAL</strong><br><br>Generamos 600 puntos equidistantes desde t=0 hasta t=T.<br><br><strong>Propósito:</strong> Discretizar el tiempo para evaluar la función h(t) en múltiples puntos y poder graficar la curva continua.">
+t_anal = np.linspace(0, T, 600)</span>
+<span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+  data-bs-title="<strong>EVALUACIÓN VECTORIAL DE LA SOLUCIÓN</strong><br><br>Aprovechamos que NumPy permite evaluar funciones sobre arrays completos.<br><br><strong>Ventaja:</strong> En lugar de un bucle, evaluamos todos los puntos de tiempo simultáneamente, lo que es computacionalmente eficiente.">
+y_anal = h_cono_anal(h0, a, R0, H, t_anal, g)</span>
+
+# visualización
+<span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+  data-bs-title="<strong>GRÁFICO DE LA SOLUCIÓN</strong><br><br>Crear el gráfico principal con:<br>• <strong>Línea azul:</strong> Representa la solución analítica exacta<br>• <strong>Linewidth=2:</strong> Grosor de línea para buena visibilidad<br>• <strong>Label:</strong> Para la leyenda<br><br>Esta curva muestra cómo decae la altura del fluido de forma no-lineal.">
+plt.plot(t_anal, y_anal, color='blue', linewidth=2, label='Cono perfecto (analítica)')</span>
+<span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+  data-bs-title="<strong>CONFIGURACIÓN DEL EJE Y</strong><br><br>Fijamos los límites del eje Y para mejor visualización:<br>• <strong>Límite inferior:</strong> 0 (altura mínima)<br>• <strong>Límite superior:</strong> máximo entre 1 y h₀<br><br>Esto asegura que siempre veamos todo el rango relevante de alturas.">
+plt.ylim(0, max(1, h0))</span>
+<span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+  data-bs-title="<strong>ETIQUETAS DE EJES</strong><br><br>Etiquetas claras para ambos ejes:<br>• <strong>Eje X:</strong> Tiempo en segundos<br>• <strong>Eje Y:</strong> Altura en metros<br><br>Buenas prácticas de visualización científica requieren unidades explícitas.">
+plt.xlabel("Tiempo t (s)"); plt.ylabel("Altura h(t) (m)")</span>
+<span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+  data-bs-title="<strong>TÍTULO INFORMATIVO</strong><br><br>El título debe describir claramente:<br>• Qué sistema se modela (cono perfecto)<br>• Qué tipo de solución se muestra (analítica)<br>• Qué fenómeno se estudia (vaciado)<br><br>Ayuda al espectador a entender rápidamente el contexto.">
+plt.title("Vaciado en cono perfecto — solución analítica")</span>
+<span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+  data-bs-title="<strong>CUADrÍCULA PARA MEJOR LECTURA</strong><br><br>La cuadrícula ayuda a:<br>• Leer valores aproximados del gráfico<br>• Seguir la evolución temporal<br>• Identificar puntos característicos<br><br>Alpha=0.3 la hace visible pero no intrusiva.">
+plt.grid(True, alpha=0.3, linestyle='--')</span>
+<span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+  data-bs-title="<strong>LEYENDA EXPLICATIVA</strong><br><br>La leyenda identifica:<br>• Qué representa cada curva (en este caso, una sola)<br>• El tipo de solución (analítica)<br><br>Esencial cuando hay múltiples curvas en el mismo gráfico.">
+plt.legend()</span>
+<span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+  data-bs-title="<strong>AJUSTE AUTOMÁTICO DEL DISEÑO</strong><br><br><code>tight_layout()</code> automáticamente:<br>• Ajusta espaciado entre elementos<br>• Evita que etiquetas se salgan del área de plotting<br>• Mejora la estética general<br><br>Buena práctica siempre incluirla.">
+plt.tight_layout()</span>
+plt.show()`;
+
+    codeEl.textContent = '';
+    codeEl.innerHTML = codeHtml;
+
+    setTimeout(() => {
+      initTooltips();
+      if (window.MathJax && MathJax.typesetPromise) {
+        MathJax.typesetPromise([codeEl]).catch(() => {});
+      }
+    }, 100);
+  }
+
+  // ---------- Reset ----------
+  const resetBtn = document.getElementById('reset');
+  const defaults = { a:0.001, g:9.8, h0:1.0, R0:0.4, H:1.0, N:600 };
+  resetBtn.addEventListener('click', () => {
+    aEl.value  = defaults.a;
+    gEl.value  = defaults.g;
+    h0El.value = defaults.h0;
+    R0El.value = defaults.R0;
+    HEl.value  = defaults.H;
+    nEl.value  = defaults.N;
+    updateAll();
+  });
+
+  // ---------- Ciclo de actualización ----------
+  function updateAll(){
+    const a  = Math.max(1e-12, parseFloat(aEl.value));
+    const g  = Math.max(1e-12, parseFloat(gEl.value));
+    const h0 = Math.max(0, parseFloat(h0El.value));
+    const R0 = Math.max(1e-12, parseFloat(R0El.value));
+    const H  = Math.max(1e-12, parseFloat(HEl.value));
+    const N  = Math.max(2, parseInt(nEl.value || '600', 10));
+
+    renderCode(a, g, h0, R0, H);
+    updateChart(a, g, h0, R0, H, N);
+  }
+
+  [aEl, gEl, h0El, R0El, HEl, nEl].forEach(inp => {
+    inp.addEventListener('input', updateAll);
+    inp.addEventListener('change', updateAll);
+  });
+
+  // Copiar código
+  const copyBtn = document.getElementById('copy');
+  copyBtn.addEventListener('click', () => {
+    const tmp = document.createElement('textarea');
+    tmp.value = codeEl.innerText;
+    document.body.appendChild(tmp);
+    tmp.select();
+    document.execCommand('copy');
+    document.body.removeChild(tmp);
+    copyBtn.textContent = '¡Copiado!';
+    setTimeout(()=> copyBtn.textContent = 'Copiar código', 1200);
+  });
+
+  // LaTeX en el MODAL
+  const explanationModal = document.getElementById('explicacionModal');
+  if (explanationModal){
+    explanationModal.addEventListener('shown.bs.modal', () => {
+      if (window.MathJax && MathJax.typesetPromise) {
+        MathJax.typesetPromise([explanationModal]).catch(() => {});
+      }
+    });
+  }
+
+  // Inicialización
+  initTooltips();
+  updateAll();
+});
+</script>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+  <h1 class="h3 mb-2">Cono perfecto — método analítico con Python</h1>
+  <p class="lead-note mb-3">
+    Aquí \(A(h)=\pi\,(R_0/H)^2\,h^2\). Derivamos la solución cerrada
+    \(h(t)=\big(h_0^{5/2}-\tfrac{5}{2}\tfrac{aH^2}{\pi R_0^2}\sqrt{2g}\,t\big)^{2/5}\)
+    y el tiempo de vaciado \(T\).
+    <span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+      data-bs-title="<strong>MÉTODO ANALÍTICO VS NUMÉRICO</strong><br><br><strong>Ventajas del analítico:</strong><br>• Solución exacta<br>• Fórmula cerrada<br>• Entendimiento físico completo<br><br><strong>Limitaciones:</strong><br>• Solo para geometrías simples<br>• Requiere integración exacta posible">
+      💡 Comparación de métodos
+    </span>
+  </p>
+
+  <div class="row g-3 align-items-stretch mb-4">
+    <div class="col-lg-4">
+      <div class="card h-100">
+        <div class="card-body">
+          <h6 class="text-secondary mb-3">
+            Parámetros del modelo (cono perfecto)
+            <span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+              data-bs-title="<strong>GEOMETRÍA DEL CONO PERFECTO</strong><br><br>En un cono perfecto el radio crece linealmente con h:<br>\\[ R(h) = \\frac{R_0}{H} h \\]<br><br>Esto implica que el área transversal crece con h²:<br>\\[ A(h) = \\pi R(h)^2 = \\pi \\left(\\frac{R_0}{H}\\right)^2 h^2 \\]">
+              ⓘ
+            </span>
+          </h6>
+
+          <div class="param-grid">
+            <div>
+              <label class="form-label">a (m²) — área del orificio</label>
+              <input type="number" step="any" class="form-control" id="parama" value="0.001">
+            </div>
+
+            <div>
+              <label class="form-label">g (m/s²)</label>
+              <input type="number" step="any" class="form-control" id="paramg" value="9.8">
+            </div>
+
+            <div>
+              <label class="form-label">h₀ (m)</label>
+              <input type="number" step="any" class="form-control" id="paramh0" value="1.0">
+            </div>
+
+            <div>
+              <label class="form-label">R₀ (m) — radio de la boca</label>
+              <input type="number" step="any" class="form-control" id="paramR0" value="0.4">
+            </div>
+
+            <div>
+              <label class="form-label">H (m) — altura total</label>
+              <input type="number" step="any" class="form-control" id="paramH" value="1.0">
+            </div>
+
+            <div class="full">
+              <label class="form-label">N (puntos de discretización)</label>
+              <input type="number" step="1" min="50" class="form-control" id="paramN" value="600">
+            </div>
+          </div>
+
+          <div class="mt-3 d-flex justify-content-between align-items-center">
+            <button class="btn btn-outline-secondary btn-sm" id="reset" type="button">Restablecer</button>
+            <span class="badge bg-primary fs-6">
+              \(T\) = <span id="tvac">—</span>
+              <span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+                data-bs-title="<strong>TIEMPO DE VACIADO - INTERPRETACIÓN FÍSICA</strong><br><br>\\[ T = \\frac{2\\pi R_0^2}{5aH^2\\sqrt{2g}} h_0^{5/2} \\]<br><br><strong>Dependencias:</strong><br>• <strong>∝ R₀²:</strong> Cono más ancho → más tiempo<br>• <strong>∝ 1/a:</strong> Orificio más pequeño → más tiempo<br>• <strong>∝ h₀²·⁵:</strong> Altura inicial mayor → mucho más tiempo<br><br>El exponente 2.5 refleja la no-linealidad del sistema.">
+                ⓘ
+              </span>
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-8">
+      <div class="card h-100">
+        <div class="card-body">
+          <h6 class="text-secondary mb-3">
+            Evolución temporal \(h(t)\)
+            <span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+              data-bs-title="<strong>CARACTERÍSTICAS DE LA CURVA h(t)</strong><br><br>\\[ h(t) = \\left(h_0^{5/2} - \\frac{5}{2}C t\\right)^{2/5} \\]<br><br><strong>Comportamiento:</strong><br>• <strong>Decaimiento no-lineal:</strong> Más rápido al inicio<br>• <strong>Derivada infinita en t=T:</strong> h'(T) → -∞<br>• <strong>Forma cóncava:</strong> Refleja el área decreciente<br><br>Esto contrasta con el cilindro donde h(t) es cuadrático.">
+              ⓘ
+            </span>
+          </h6>
+
+          <canvas id="chart" height="120"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="d-flex justify-content-between align-items-center mb-2">
+    <h6 class="mb-0 text-secondary">Código Python con anotaciones</h6>
+    <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#explicacionModal">
+      Ver explicación del método
+    </button>
+  </div>
+
+  <div class="code-wrap mb-4">
+    <button class="copy-btn" id="copy" type="button">Copiar código</button>
+    <pre class="code"><code id="code-block"></code></pre>
+  </div>
+</div>
+
+<!-- ===== Modal de explicación ===== -->
+<div class="modal fade" id="explicacionModal" tabindex="-1" aria-labelledby="explicacionLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="explicacionLabel">De continuidad + Torricelli a \(h(t)\) en un cono perfecto</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+
+      <div class="modal-body">
+        <h6>1. Fundamentos Físicos</h6>
+        <p><strong>Ecuación de Torricelli:</strong> \( v = \sqrt{2gh} \)</p>
+        <p><strong>Caudal de salida:</strong> \( Q = a \cdot v = a\sqrt{2gh} \)</p>
+        
+        <h6>2. Geometría del Cono</h6>
+        <p>Radio a altura \(h\): \( R(h) = \dfrac{R_0}{H}h \)</p>
+        <p>Área transversal: \( A(h) = \pi [R(h)]^2 = \pi \left(\dfrac{R_0}{H}\right)^2 h^2 \)</p>
+        
+        <h6>3. Ecuación Diferencial</h6>
+        <p>Por conservación de masa: \( A(h)\dfrac{dh}{dt} = -Q \)</p>
+        <p>\[ \pi \left(\dfrac{R_0}{H}\right)^2 h^2 \dfrac{dh}{dt} = -a\sqrt{2gh} \]</p>
+        
+        <h6>4. Separación de Variables</h6>
+        <p>Reordenamos: \( h^{3/2} dh = -\dfrac{aH^2}{\pi R_0^2}\sqrt{2g} dt \)</p>
+        <p>Definimos constante: \( C = \dfrac{aH^2}{\pi R_0^2}\sqrt{2g} \)</p>
+        <p>\[ h^{3/2} dh = -C dt \]</p>
+        
+        <h6>5. Integración</h6>
+        <p>Integramos ambos lados:</p>
+        <p>\[ \int_{h_0}^{h} \xi^{3/2} d\xi = -C \int_0^t d\tau \]</p>
+        <p>\[ \left[\frac{2}{5}\xi^{5/2}\right]_{h_0}^{h} = -C t \]</p>
+        <p>\[ \frac{2}{5}(h^{5/2} - h_0^{5/2}) = -C t \]</p>
+        
+        <h6>6. Solución Final</h6>
+        <p>Despejando \(h(t)\):</p>
+        <p>\[ h^{5/2} = h_0^{5/2} - \frac{5}{2}C t \]</p>
+        <p>\[ h(t) = \left(h_0^{5/2} - \frac{5}{2}C t\right)^{2/5} \]</p>
+        
+        <h6>7. Tiempo de Vaciado</h6>
+        <p>Cuando \(h(T) = 0\):</p>
+        <p>\[ 0 = h_0^{5/2} - \frac{5}{2}C T \]</p>
+        <p>\[ T = \frac{2}{5C} h_0^{5/2} = \frac{2\pi R_0^2}{5aH^2\sqrt{2g}} h_0^{5/2} \]</p>
+
+        <div class="alert alert-info small">
+          <strong>Nota importante:</strong> El exponente 5/2 (2.5) surge naturalmente de la integración y refleja 
+          la combinación de la geometría cónica (A ∝ h²) con la dinámica de Torricelli (v ∝ √h).
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

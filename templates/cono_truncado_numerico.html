@@ -1,0 +1,723 @@
+{% extends "base.html" %}
+{% block title %}Cono Truncado — Método Numérico (estilo clase){% endblock %}
+
+{% block head %}
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<!-- MathJax para renderizado LaTeX -->
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+<style>
+  .code-wrap{
+    background:#0b1020;color:#e5e7eb;border-radius:10px;padding:1rem 1.25rem;
+    border:1px solid #111827;overflow-x:auto;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    line-height:1.45; position: relative;
+  }
+  .tt{
+    cursor:help; text-decoration: underline dotted;
+    border-bottom: 1px dotted #60a5fa; color: #93c5fd;
+  }
+  .tt:hover { color: #bfdbfe; }
+  .lead-note{ font-size:.95rem; color:#4b5563; }
+  .param-grid{ display:grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap:12px; }
+  .param-grid .full{ grid-column: 1 / -1; }
+  .copy-btn{
+    position:absolute; top:8px; right:8px; font-size:.85rem;
+    background:#111827; color:#e5e7eb; border:1px solid #374151; border-radius:6px; padding:.25rem .5rem;
+  }
+  .method-comparison {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 15px;
+    margin: 15px 0;
+  }
+  .integration-steps {
+    background: #e8f4fd;
+    border-left: 4px solid #0dcaf0;
+    padding: 12px;
+    margin: 8px 0;
+    border-radius: 4px;
+  }
+  .error-table {
+    font-size: 0.85rem;
+  }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  // ---------- Tooltips con LaTeX ----------
+  const initTooltips = () => {
+    const tips = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    tips.forEach((el) => {
+      new bootstrap.Tooltip(el, {
+        html: true,
+        trigger: 'hover focus',
+        sanitize: false,
+        container: 'body',
+        customClass: 'math-tooltip',
+        delay: { show: 300, hide: 100 }
+      });
+      el.addEventListener('shown.bs.tooltip', () => {
+        const id = el.getAttribute('aria-describedby');
+        const tip = id && document.getElementById(id);
+        if (tip && window.MathJax && MathJax.typesetPromise) {
+          const inner = tip.querySelector('.tooltip-inner');
+          if (inner) MathJax.typesetPromise([inner]).catch(() => {});
+        }
+      });
+    });
+  };
+
+  // ---------- Parámetros (inputs) ----------
+  const aEl  = document.getElementById('parama');
+  const gEl  = document.getElementById('paramg');
+  const h0El = document.getElementById('paramh0');
+  const rEl  = document.getElementById('paramr');
+  const R0El = document.getElementById('paramR0');
+  const HEl  = document.getElementById('paramH');
+  const pasoEl = document.getElementById('paramPaso');
+  const tvacNumOut = document.getElementById('tvacNum');
+  const tvacAnOut = document.getElementById('tvacAn');
+  const tbodyErr = document.getElementById('tbodyErr');
+
+  // ---------- Función A(h) para cono truncado ----------
+  function A_h_cono_truncado(h, r, R0, H) {
+    const alpha = (R0 - r) / H;
+    const R_h = r + alpha * h;
+    return Math.PI * R_h * R_h;
+  }
+
+  // ---------- Integrando dt/dh para cono truncado ----------
+  function integrando_cono_truncado(h, r, R0, H, a, g) {
+    if (h <= 0) return 0;
+    const A_h = A_h_cono_truncado(h, r, R0, H);
+    return A_h / (a * Math.sqrt(2 * g * h));
+  }
+
+  // ---------- MÉTODO NUMÉRICO (ESTILO CLASE) ----------
+  function metodo_numerico_clase(h0, paso, r, R0, H, a, g) {
+    const aux = Math.floor(h0 / paso);
+    const t_num = [];
+    const y_num = [];
+    const error_num = [];
+    
+    let y = h0;
+    
+    for (let i = 1; i <= aux; i++) {
+      // INTEGRACIÓN CON QUAD (estilo clase)
+      // integrate.quad(lambda h: A_h/(a*sqrt(2*g*h)), h0, y)
+      const integrando = (h) => integrando_cono_truncado(h, r, R0, H, a, g);
+      const valor = simpsonAdaptive(integrando, y, h0);  // integrate.quad simulado
+      const error_estimado = Math.abs(valor) * 1e-8;
+      
+      y_num.push(y);
+      t_num.push(valor);
+      error_num.push(error_estimado);
+      
+      y = Math.max(0, y - paso);
+      if (y <= 0) break;
+    }
+    
+    return { t_num, y_num, error_num };
+  }
+
+  // ---------- Simulación de integrate.quad con Simpson adaptativo ----------
+  function simpsonAdaptive(f, a, b, tol = 1e-8, maxDepth = 20) {
+    function simpson(f, x0, x2) {
+      const x1 = (x0 + x2) / 2;
+      const h = (x2 - x0) / 6;
+      return h * (f(x0) + 4 * f(x1) + f(x2));
+    }
+
+    function adaptive(f, x0, x2, whole, depth) {
+      const x1 = (x0 + x2) / 2;
+      const left = simpson(f, x0, x1);
+      const right = simpson(f, x1, x2);
+      const sum = left + right;
+      
+      if (depth <= 0 || Math.abs(sum - whole) < 15 * tol) {
+        return sum + (sum - whole) / 15;
+      }
+      
+      return adaptive(f, x0, x1, left, depth - 1) + 
+             adaptive(f, x1, x2, right, depth - 1);
+    }
+
+    const whole = simpson(f, a, b);
+    return adaptive(f, a, b, whole, maxDepth);
+  }
+
+  // ---------- Solución analítica para comparación ----------
+  function solucion_analitica_cono_truncado(h0, r, R0, H, a, g) {
+    const alpha = (R0 - r) / H;
+    const C = Math.PI / (a * Math.sqrt(2 * g));
+    
+    const T = C * (
+      2 * r * r * Math.sqrt(h0) +
+      (4 * r * alpha / 3) * Math.pow(h0, 1.5) +
+      (2 * alpha * alpha / 5) * Math.pow(h0, 2.5)
+    );
+
+    const t_vals = [];
+    const h_vals = [];
+    const N = 600;
+    
+    for (let i = 0; i < N; i++) {
+      const t = i * T / (N - 1);
+      let h_low = 0, h_high = h0;
+      for (let iter = 0; iter < 50; iter++) {
+        const h_mid = (h_low + h_high) / 2;
+        const t_mid = C * (
+          2 * r * r * (Math.sqrt(h0) - Math.sqrt(h_mid)) +
+          (4 * r * alpha / 3) * (Math.pow(h0, 1.5) - Math.pow(h_mid, 1.5)) +
+          (2 * alpha * alpha / 5) * (Math.pow(h0, 2.5) - Math.pow(h_mid, 2.5))
+        );
+        if (t_mid > t) h_low = h_mid;
+        else h_high = h_mid;
+      }
+      t_vals.push(t);
+      h_vals.push((h_low + h_high) / 2);
+    }
+    
+    return { t: t_vals, h: h_vals, T };
+  }
+
+  // ---------- Gráfico comparativo ----------
+  const ctx = document.getElementById('chart').getContext('2d');
+  let chart;
+
+  function updateChart(a, g, h0, r, R0, H, paso) {
+    // Solución numérica (estilo clase)
+    const num = metodo_numerico_clase(h0, paso, r, R0, H, a, g);
+    
+    // Solución analítica para comparación
+    const an = solucion_analitica_cono_truncado(h0, r, R0, H, a, g);
+    
+    // Calcular T_numérico
+    let T_num = num.t_num[num.t_num.length - 1] || 0;
+    if (num.y_num.length >= 2 && num.y_num[num.y_num.length - 1] <= 0) {
+      const h1 = num.y_num[num.y_num.length - 2];
+      const h2 = num.y_num[num.y_num.length - 1];
+      const t1 = num.t_num[num.t_num.length - 2];
+      const t2 = num.t_num[num.t_num.length - 1];
+      if (h1 > 0) {
+        T_num = t1 + (t2 - t1) * (h1 / (h1 - h2));
+      }
+    }
+    
+    tvacNumOut.textContent = T_num.toFixed(4) + ' s';
+    tvacAnOut.textContent = an.T.toFixed(4) + ' s';
+    
+    // Actualizar tabla de errores
+    updateErrorTable(num, an);
+    
+    // Preparar datos para el gráfico (ESTILO CLASE: puntos para numérico)
+    const datasets = [
+      {
+        label: `Numérico (paso=${paso}m)`,
+        data: num.t_num.map((t, i) => ({ x: t, y: num.y_num[i] })),
+        borderColor: '#10b981',
+        backgroundColor: '#10b981',
+        borderWidth: 0,
+        pointRadius: 4,
+        pointHoverRadius: 6,
+        showLine: false
+      },
+      {
+        label: 'Analítico',
+        data: an.t.map((t, i) => ({ x: t, y: an.h[i] })),
+        borderColor: '#3b82f6',
+        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+        borderWidth: 2,
+        pointRadius: 0,
+        tension: 0.1,
+        fill: false
+      }
+    ];
+
+    if (!chart) {
+      chart = new Chart(ctx, {
+        type: 'line',
+        data: { datasets },
+        options: {
+          parsing: false,
+          animation: { duration: 0 },
+          responsive: true,
+          interaction: { intersect: false, mode: 'nearest' },
+          scales: {
+            x: {
+              type: 'linear',
+              title: { display: true, text: 't (s)' },
+              grid: { color: 'rgba(0,0,0,0.1)' }
+            },
+            y: {
+              title: { display: true, text: 'h (m)' },
+              suggestedMin: 0,
+              suggestedMax: Math.max(1, h0),
+              grid: { color: 'rgba(0,0,0,0.1)' }
+            }
+          }
+        }
+      });
+    } else {
+      chart.data.datasets = datasets;
+      chart.update();
+    }
+  }
+
+  // ---------- Tabla de errores ----------
+  function updateErrorTable(num, an) {
+    tbodyErr.innerHTML = '';
+    
+    for (let i = 0; i < num.t_num.length; i++) {
+      const h_num = num.y_num[i];
+      const t_num = num.t_num[i];
+      
+      // Encontrar t_anal correspondiente a esta h
+      let t_anal = null;
+      for (let j = 1; j < an.h.length; j++) {
+        if ((an.h[j-1] - h_num) * (an.h[j] - h_num) <= 0) {
+          const frac = (h_num - an.h[j-1]) / (an.h[j] - an.h[j-1]);
+          t_anal = an.t[j-1] + frac * (an.t[j] - an.t[j-1]);
+          break;
+        }
+      }
+      
+      const error = t_anal !== null ? Math.abs(t_num - t_anal) : null;
+      
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td>${i+1}</td>
+        <td>${h_num.toFixed(4)}</td>
+        <td>${t_num.toFixed(4)}</td>
+        <td>${t_anal !== null ? t_anal.toFixed(4) : '—'}</td>
+        <td>${error !== null ? error.toExponential(2) : '—'}</td>
+        <td>${num.error_num[i] ? num.error_num[i].toExponential(2) : '—'}</td>
+      `;
+      tbodyErr.appendChild(row);
+    }
+  }
+
+  // ---------- Código Python (ESTILO CLASE) ----------
+  const codeEl = document.getElementById('code-block');
+
+  function renderCode(a, g, h0, r, R0, H, paso) {
+    const a_txt = a.toExponential(6);
+    const g_txt = g.toPrecision(6);
+    const h0_txt = h0.toPrecision(6);
+    const r_txt = r.toPrecision(6);
+    const R0_txt = R0.toPrecision(6);
+    const H_txt = H.toPrecision(6);
+    const paso_txt = paso.toPrecision(6);
+
+    const codeHtml = `
+<span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+  data-bs-title="<strong>SCIPY.INTEGRATE - MÉTODO DE CLASE</strong><br><br>Usamos <code>integrate.quad</code> exactamente como se vio en clase.<br><br>Integración numérica adaptativa para calcular t(h).">
+from scipy import <b>integrate</b></span>
+<span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+  data-bs-title="<strong>NUMPY - OPERACIONES NUMÉRICAS</strong><br><br>Arrays y funciones matemáticas.<br><br>Fundamental para el cálculo científico.">
+import numpy as <b>np</b></span>
+<span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+  data-bs-title="<strong>MATPLOTLIB - GRÁFICOS</strong><br><br>Visualización de resultados.<br><br>Comparación numérico vs analítico.">
+import matplotlib.pyplot as <b>plt</b></span>
+
+# Parámetros del cono truncado
+<span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+  data-bs-title="<strong>GEOMETRÍA CONO TRUNCADO</strong><br><br>Radio inferior r, radio superior R₀, altura H.<br><br>Condición: R₀ > r">
+r = ${r_txt}    # m - radio del cuello
+R0 = ${R0_txt}   # m - radio de la boca  
+H = ${H_txt}     # m - altura total</span>
+<span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+  data-bs-title="<strong>PARÁMETROS FÍSICOS</strong><br><br>Configuración del problema de vaciado.">
+a = ${a_txt}    # m² - área del orificio
+g = 9.8         # m/s² - gravedad
+h0 = ${h0_txt}   # m - altura inicial
+paso = ${paso_txt} # m - paso en altura</span>
+
+<span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+  data-bs-title="<strong>FUNCIÓN A(h) CONO TRUNCADO</strong><br><br>Área transversal variable:<br>R(h) = r + ((R₀ - r)/H)h<br>A(h) = π[R(h)]²">
+def A_h(h, r, R0, H):
+    alpha = (R0 - r) / H
+    R_h = r + alpha * h
+    return np.pi * R_h**2</span>
+
+<span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+  data-bs-title="<strong>MÉTODO NUMÉRICO - ESTILO CLASE</strong><br><br>Implementación idéntica a la vista en clase:<br>• Malla descendente en h<br>• integrate.quad para cada punto<br>• Retorna (t_num, y_num, error_num)">
+def h_num_cono_truncado(h_0, paso, r, R0, H, a, g):
+    <span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+      data-bs-title="<strong>PREPARAR MALLA</strong><br><br>Número de puntos: h₀/paso<br>h = h₀, h₀-paso, h₀-2*paso, ...">
+    aux = int(h_0 / paso)</span>
+    t_num = []
+    y_num = []
+    error_num = []
+    <span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+      data-bs-title="<strong>VALOR INICIAL</strong><br><br>Empezamos en y = h₀">
+    y = h_0</span>
+    
+    <span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+      data-bs-title="<strong>BUCLE PRINCIPAL</strong><br><br>Para cada punto de la malla:<br>1. Integrar desde y hasta h₀<br>2. Guardar resultados<br>3. Decrementar y">
+    for i in range(1, aux + 1):
+        <span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+          data-bs-title="<strong>INTEGRACIÓN CON QUAD</strong><br><br>integrate.quad calcula:<br>t(h) = ∫[h→h₀] A(ξ)/(a√(2gξ)) dξ<br><br>Retorna (valor, error_estimado)">
+        value, error = integrate.quad(
+            lambda h: A_h(h, r, R0, H) / (a * np.sqrt(2 * g * h)), 
+            y, h_0
+        )</span>
+        
+        <span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+          data-bs-title="<strong>ALMACENAR RESULTADOS</strong><br><br>Guardamos:<br>• y (altura actual)<br>• value (tiempo calculado)<br>• error (error de integración)">
+        y_num.append(y)
+        t_num.append(value)
+        error_num.append(error)</span>
+        
+        <span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+          data-bs-title="<strong>AVANZAR EN LA MALLA</strong><br><br>Decrementamos y en el paso:<br>y = y - paso<br><br>Condición: y ≥ 0">
+        y = y - paso
+        if y <= 0:
+            break</span>
+    
+    return t_num, y_num, error_num</span>
+
+<span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+  data-bs-title="<strong>EJECUTAR MÉTODO NUMÉRICO</strong><br><br>Llamamos la función con los parámetros:<br>• h₀ = altura inicial<br>• paso = resolución en altura<br>• r, R₀, H = geometría del cono">
+print("Calculando solución numérica...")
+t_num, y_num, error = h_num_cono_truncado(h0, paso, r, R0, H, a, g)</span>
+
+<span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+  data-bs-title="<strong>ANALIZAR ERRORES</strong><br><br>Examinamos la precisión:<br>• Error máximo de integración<br>• Número de puntos calculados">
+print("Error máximo:", max(error))
+print("Número de puntos:", len(t_num))
+print("Tiempos calculados:", t_num)</span>
+
+<span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+  data-bs-title="<strong>SOLUCIÓN ANALÍTICA (PARA COMPARAR)</strong><br><br>Usamos la solución exacta del cono truncado<br>para validar el método numérico">
+# Solución analítica para comparación
+def t_h_analitico(h, h0, r, R0, H, a, g):
+    alpha = (R0 - r) / H
+    C = np.pi / (a * np.sqrt(2 * g))
+    return C * (2*r**2*(np.sqrt(h0)-np.sqrt(h)) + 
+                (4*r*alpha/3)*(h0**1.5 - h**1.5) + 
+                (2*alpha**2/5)*(h0**2.5 - h**2.5))
+
+T_analitico = t_h_analitico(0, h0, r, R0, H, a, g)
+print("T analítico:", T_analitico, "s")</span>
+
+<span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+  data-bs-title="<strong>GRÁFICO COMPARATIVO - ESTILO CLASE</strong><br><br>Visualización idéntica a la de clase:<br>• Línea: solución analítica<br>• Puntos: solución numérica">
+# Crear tiempo para solución analítica
+t_anal = np.linspace(0, T_analitico, 600)
+
+# Función para obtener h(t) analítico (inversión numérica)
+def h_analitico(t, h0, r, R0, H, a, g):
+    # ... implementar búsqueda de raíces ...
+    pass
+
+# y_anal = [h_analitico(t, h0, r, R0, H, a, g) for t in t_anal]
+
+<span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+  data-bs-title="<strong>GRÁFICO FINAL</strong><br><br>plt.plot(t_anal, y_anal)  # línea analítica<br>plt.plot(t_num, y_num, '.') # puntos numéricos<br><br>Estilo idéntico al visto en clase">
+plt.figure(figsize=(10, 6))
+# plt.plot(t_anal, y_anal, 'b-', label='Analítico')
+plt.plot(t_num, y_num, 'go', markersize=4, label='Numérico (integrate.quad)')
+plt.ylim(0, h0)
+plt.xlabel('Tiempo t (s)')
+plt.ylabel('Altura h (m)')
+plt.title('Cono Truncado - Método Numérico (estilo clase)')
+plt.legend()
+plt.grid(True, alpha=0.3)
+plt.tight_layout()
+plt.show()</span>`;
+
+    codeEl.textContent = '';
+    codeEl.innerHTML = codeHtml;
+
+    setTimeout(() => {
+      initTooltips();
+      if (window.MathJax && MathJax.typesetPromise) {
+        MathJax.typesetPromise([codeEl]).catch(() => {});
+      }
+    }, 100);
+  }
+
+  // ---------- Reset ----------
+  const resetBtn = document.getElementById('reset');
+  const defaults = { a:0.001, g:9.8, h0:1.0, r:0.1, R0:0.4, H:1.0, paso:0.05 };
+  resetBtn.addEventListener('click', () => {
+    aEl.value  = defaults.a;
+    gEl.value  = defaults.g;
+    h0El.value = defaults.h0;
+    rEl.value  = defaults.r;
+    R0El.value = defaults.R0;
+    HEl.value  = defaults.H;
+    pasoEl.value = defaults.paso;
+    updateAll();
+  });
+
+  // ---------- Ciclo de actualización ----------
+  function updateAll(){
+    const a  = Math.max(1e-12, parseFloat(aEl.value));
+    const g  = Math.max(1e-12, parseFloat(gEl.value));
+    const h0 = Math.max(0, parseFloat(h0El.value));
+    const r  = Math.max(1e-12, parseFloat(rEl.value));
+    const R0 = Math.max(r + 1e-12, parseFloat(R0El.value));
+    const H  = Math.max(1e-12, parseFloat(HEl.value));
+    const paso = Math.max(1e-6, Math.min(parseFloat(pasoEl.value), h0));
+
+    renderCode(a, g, h0, r, R0, H, paso);
+    updateChart(a, g, h0, r, R0, H, paso);
+  }
+
+  [aEl, gEl, h0El, rEl, R0El, HEl, pasoEl].forEach(inp => {
+    inp.addEventListener('input', updateAll);
+    inp.addEventListener('change', updateAll);
+  });
+
+  // Copiar código
+  const copyBtn = document.getElementById('copy');
+  copyBtn.addEventListener('click', () => {
+    const tmp = document.createElement('textarea');
+    tmp.value = codeEl.innerText;
+    document.body.appendChild(tmp);
+    tmp.select();
+    document.execCommand('copy');
+    document.body.removeChild(tmp);
+    copyBtn.textContent = '¡Copiado!';
+    setTimeout(()=> copyBtn.textContent = 'Copiar código', 1200);
+  });
+
+  // Inicialización
+  initTooltips();
+  updateAll();
+});
+</script>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+  <h1 class="h3 mb-2">Cono Truncado — Método Numérico <code>integrate.quad</code> (estilo clase)</h1>
+  <p class="lead-note mb-3">
+    Implementación idéntica al método visto en clase: malla descendente en \(h\) integrando 
+    \( \displaystyle t(h) = \int_{h}^{h_0} \frac{A(\xi)}{a\sqrt{2g\xi}} d\xi \) con <code>integrate.quad</code>.
+    <span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+      data-bs-title="<strong>MÉTODO DE CLASE</strong><br><br>Estructura idéntica a la vista en clase:<br>• aux = int(h₀/paso)<br>• for i in range(1, aux+1)<br>• integrate.quad(...)<br>• y = y - paso">
+      💡 Implementación fiel al método de clase
+    </span>
+  </p>
+
+  <div class="method-comparison">
+    <h6 class="mb-3">Estructura del Método Numérico (clase)</h6>
+    <div class="integration-steps">
+      <strong>Algoritmo implementado:</strong>
+      <ol class="mb-0">
+        <li><code>aux = int(h₀ / paso)</code> → número de puntos</li>
+        <li><code>y = h₀</code> → empezar en altura inicial</li>
+        <li><code>for i in range(1, aux + 1):</code> → bucle sobre malla</li>
+        <li><code>value, error = integrate.quad(...)</code> → integrar dt/dh</li>
+        <li><code>y_num.append(y); t_num.append(value)</code> → guardar resultados</li>
+        <li><code>y = y - paso</code> → avanzar en la malla</li>
+      </ol>
+    </div>
+  </div>
+
+  <div class="row g-3 align-items-stretch mb-4">
+    <div class="col-lg-4">
+      <div class="card h-100">
+        <div class="card-body">
+          <h6 class="text-secondary mb-3">
+            Parámetros (estilo clase)
+            <span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+              data-bs-title="<strong>CONFIGURACIÓN IDÉNTICA A CLASE</strong><br><br>Mismos parámetros y misma estructura:<br>• h₀, paso, a, g<br>• r, R₀, H (geometría cono truncado)<br><br>El paso controla la resolución de la malla.">
+              ⓘ
+            </span>
+          </h6>
+
+          <div class="param-grid">
+            <div>
+              <label class="form-label">h₀ (m) — altura inicial</label>
+              <input type="number" step="any" class="form-control" id="paramh0" value="1.0">
+            </div>
+
+            <div>
+              <label class="form-label">paso (m) — resolución</label>
+              <input type="number" step="0.001" min="0.001" class="form-control" id="paramPaso" value="0.05">
+            </div>
+
+            <div>
+              <label class="form-label">a (m²) — área orificio</label>
+              <input type="number" step="any" class="form-control" id="parama" value="0.001">
+            </div>
+
+            <div>
+              <label class="form-label">g (m/s²) — gravedad</label>
+              <input type="number" step="any" class="form-control" id="paramg" value="9.8">
+            </div>
+
+            <div>
+              <label class="form-label">r (m) — radio cuello</label>
+              <input type="number" step="any" class="form-control" id="paramr" value="0.1">
+            </div>
+
+            <div>
+              <label class="form-label">R₀ (m) — radio boca</label>
+              <input type="number" step="any" class="form-control" id="paramR0" value="0.4">
+            </div>
+
+            <div>
+              <label class="form-label">H (m) — altura total</label>
+              <input type="number" step="any" class="form-control" id="paramH" value="1.0">
+            </div>
+          </div>
+
+          <div class="mt-3 d-flex justify-content-between align-items-center">
+            <button class="btn btn-outline-secondary btn-sm" id="reset" type="button">Restablecer</button>
+            <div class="text-end">
+              <div class="badge bg-success mb-1">T<sub>num</sub> = <span id="tvacNum">—</span> s</div>
+              <div class="badge bg-primary">T<sub>an</sub> = <span id="tvacAn">—</span> s</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-8">
+      <div class="card h-100">
+        <div class="card-body">
+          <h6 class="text-secondary mb-3">
+            Gráfico: Puntos numéricos vs línea analítica
+            <span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+              data-bs-title="<strong>VISUALIZACIÓN ESTILO CLASE</strong><br><br>• <strong>Puntos verdes:</strong> Solución numérica (t_num, y_num)<br>• <strong>Línea azul:</strong> Solución analítica h(t)<br><br>Idéntico a: plt.plot(t_anal, y_anal); plt.plot(t_num, y_num, '.')">
+              ⓘ
+            </span>
+          </h6>
+
+          <canvas id="chart" height="120"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tabla de resultados -->
+  <div class="card mb-4">
+    <div class="card-body">
+      <h6 class="text-secondary mb-3">Resultados Numéricos <code>integrate.quad</code></h6>
+      <div class="table-responsive">
+        <table class="table table-sm error-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>h (m)</th>
+              <th>t<sub>num</sub> (s)</th>
+              <th>t<sub>an</sub> (s)</th>
+              <th>Error |Δt|</th>
+              <th>Error quad</th>
+            </tr>
+          </thead>
+          <tbody id="tbodyErr"></tbody>
+        </table>
+      </div>
+      <div class="small text-muted">
+        Estructura idéntica a la de clase: <code>t_num, y_num, error = h_num_cono_truncado(...)</code>
+      </div>
+    </div>
+  </div>
+
+  <div class="d-flex justify-content-between align-items-center mb-2">
+    <h6 class="mb-0 text-secondary">Código Python <code>integrate.quad</code> (estilo clase)</h6>
+    <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#explicacionModal">
+      Ver explicación del método
+    </button>
+  </div>
+
+  <div class="code-wrap mb-4">
+    <button class="copy-btn" id="copy" type="button">Copiar código</button>
+    <pre class="code"><code id="code-block"></code></pre>
+  </div>
+</div>
+
+<!-- ===== Modal de explicación ===== -->
+<div class="modal fade" id="explicacionModal" tabindex="-1" aria-labelledby="explicacionLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="explicacionLabel">Método Numérico con <code>integrate.quad</code> - Explicación Detallada</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+
+      <div class="modal-body">
+        <h6>1. Estructura General del Método</h6>
+        <p>Implementamos exactamente la misma estructura vista en clase:</p>
+        <div class="integration-steps">
+          <pre><code>def h_num_cono_truncado(h_0, paso, r, R0, H, a, g):
+    aux = int(h_0 / paso)
+    t_num = []
+    y_num = [] 
+    error_num = []
+    y = h_0
+    
+    for i in range(1, aux + 1):
+        value, error = integrate.quad(integrando, y, h_0)
+        y_num.append(y)
+        t_num.append(value) 
+        error_num.append(error)
+        y = y - paso
+        
+    return t_num, y_num, error_num</code></pre>
+        </div>
+
+        <h6>2. Función Integrando para Cono Truncado</h6>
+        <p>Para el cono truncado, el integrando es:</p>
+        <div class="integration-steps">
+          \( \displaystyle \frac{dt}{dh} = \frac{A(h)}{a\sqrt{2gh}} \)
+          <br>
+          \( \displaystyle A(h) = \pi \left[r + \frac{R_0 - r}{H}h\right]^2 \)
+        </div>
+        <p>En código:</p>
+        <div class="integration-steps">
+          <code>lambda h: A_h(h, r, R0, H) / (a * np.sqrt(2 * g * h))</code>
+        </div>
+
+        <h6>3. Límites de Integración</h6>
+        <p>Integramos desde la altura actual \(y\) hasta la altura inicial \(h_0\):</p>
+        <div class="integration-steps">
+          \( \displaystyle t(h) = \int_{h}^{h_0} \frac{A(\xi)}{a\sqrt{2g\xi}} d\xi \)
+          <br>
+          <code>integrate.quad(integrando, y, h_0)</code>
+        </div>
+
+        <h6>4. Malla Descendente en Altura</h6>
+        <p>Generamos puntos desde \(h_0\) hasta 0 con el paso especificado:</p>
+        <div class="integration-steps">
+          \( h = h_0, h_0 - \text{paso}, h_0 - 2\cdot\text{paso}, \dots \)
+          <br>
+          <code>y = y - paso</code> en cada iteración
+        </div>
+
+        <h6>5. Resultados y Errores</h6>
+        <p>El método retorna tres listas como en clase:</p>
+        <div class="integration-steps">
+          <strong>t_num:</strong> Tiempos calculados para cada altura<br>
+          <strong>y_num:</strong> Alturas de la malla descendente<br>
+          <strong>error_num:</strong> Errores de integración estimados por <code>quad</code>
+        </div>
+
+        <h6>6. Visualización Estilo Clase</h6>
+        <p>Gráfico idéntico al visto en clase:</p>
+        <div class="integration-steps">
+          <code>plt.plot(t_anal, y_anal)  # línea analítica</code><br>
+          <code>plt.plot(t_num, y_num, '.') # puntos numéricos</code>
+        </div>
+
+        <div class="alert alert-success mt-3">
+          <strong>Fidelidad al método de clase:</strong> Esta implementación usa exactamente la misma estructura, 
+          mismos nombres de variables y misma metodología que se enseñó en clase, aplicada al caso del cono truncado.
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -56,6 +56,36 @@ def modelo_lineal():
     # Si quieres pasar valores por defecto desde el servidor, puedes,
     # pero el template ya trae defaults del lado del cliente.
     return render_template("integracion_lineal.html")
-  
+
+@app.route("/metodo_analiticoc")
+def metodo_analiticoc():
+    return render_template("metodo_analiticoc.html")
+
+@app.route("/metodo_numericoc")
+def metodo_numericoc():
+    return render_template("metodo_numericoc.html")
+
+@app.route("/barrido-area")
+def barrido_area():
+    return render_template("barrido_area.html")
+@app.route("/cono-perfecto-analitico")
+def cono_perfecto_analitico():
+    return render_template("cono_perfecto_analitico.html")
+
+@app.route("/cono-perfecto-numerico")
+def cono_perfecto_numerico():
+    return render_template("cono_perfecto_numerico.html")
+
+@app.route("/cono-truncado-analitico")
+def cono_truncado_analitico():
+    return render_template("cono_truncado_analitico.html")
+
+@app.route("/cono-truncado-numerico")
+def cono_truncado_numerico():
+    return render_template("cono_truncado_numerico.html")
+@app.route("/barrido-areac")
+def barrido_areac():
+    return render_template("barrido_areac.html")
+    
 if __name__ == "__main__":
     app.run(debug=True)

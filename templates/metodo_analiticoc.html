@@ -1,0 +1,571 @@
+{% extends "base.html" %}
+{% block title %}Métodos numéricos — Interactivo{% endblock %}
+
+{% block head %}
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<!-- MathJax (si ya está en base.html, puedes quitar esta línea) -->
+
+<style>
+  .code-wrap{
+    background:#0b1020;color:#e5e7eb;border-radius:10px;padding:1rem 1.25rem;
+    border:1px solid #111827;overflow-x:auto;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    line-height:1.45; position: relative;
+  }
+  .tt{
+    cursor:help; text-decoration: underline dotted;
+    border-bottom: 1px dotted #60a5fa; color: #93c5fd;
+  }
+  .tt:hover { color: #bfdbfe; }
+  .lead-note{ font-size:.95rem; color:#4b5563; }
+  .param-grid{ display:grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap:12px; }
+  .param-grid .full{ grid-column: 1 / -1; }
+  .copy-btn{
+    position:absolute; top:8px; right:8px; font-size:.85rem;
+    background:#111827; color:#e5e7eb; border:1px solid #374151; border-radius:6px; padding:.25rem .5rem;
+  }
+
+  /* Tooltips con LaTeX */
+  .tooltip { --bs-tooltip-bg:#1f2937; --bs-tooltip-color:#f9fafb; --bs-tooltip-opacity:1; }
+  .tooltip .tooltip-inner{
+    background:#1f2937; color:#f9fafb; border:1px solid #374151; border-radius:8px;
+    padding:12px 16px; font-size:0.875rem; max-width:400px;
+    box-shadow:0 4px 6px -1px rgba(0,0,0,.1), 0 2px 4px -1px rgba(0,0,0,.06);
+  }
+  .tooltip .tooltip-arrow{ display:none; }
+  .math-tooltip mjx-container{ display:inline-block; margin:0 2px; }
+  .math-tooltip mjx-math{ font-size:0.95em; }
+
+  .chart-container{ position: relative; }
+  .chart-legend{
+    background: rgba(15,23,42,.8); border:1px solid #334155; border-radius:6px;
+    padding:8px 12px; margin-top:10px;
+  }
+  .legend-item{ display:flex; align-items:center; margin-bottom:4px; font-size:.875rem; }
+  .legend-color{ width:12px; height:12px; margin-right:8px; border-radius:2px; }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  // ---------- Tooltips con soporte LaTeX ----------
+  const initTooltips = () => {
+    const tips = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    tips.forEach((el) => {
+      new bootstrap.Tooltip(el, {
+        html: true,
+        trigger: 'hover focus',
+        sanitize: false,
+        container: 'body',
+        customClass: 'math-tooltip',
+        delay: { show: 300, hide: 100 }
+      });
+      el.addEventListener('shown.bs.tooltip', () => {
+        const id = el.getAttribute('aria-describedby');
+        const tip = id && document.getElementById(id);
+        if (tip && window.MathJax && MathJax.typesetPromise) {
+          const inner = tip.querySelector('.tooltip-inner');
+          if (inner) MathJax.typesetPromise([inner]).catch(() => {});
+        }
+      });
+    });
+  };
+
+  // ---------- Parámetros (inputs) ----------
+  const AEl  = document.getElementById('paramA');
+  const aEl  = document.getElementById('parama');
+  const gEl  = document.getElementById('paramg');
+  const h0El = document.getElementById('paramh0');
+  const nEl  = document.getElementById('paramN');
+  const tvacOut = document.getElementById('tvac');
+
+  // ---------- Modelo ----------
+  function computeSeries(A, a, g, h0, N=600){
+    const k = (a/(2*A)) * Math.sqrt(2*g);
+    const t_vac = (2*A/a) * Math.sqrt(h0/(2*g));
+    const t = [], y = [];
+    for (let i=0; i<N; i++){
+      const ti = i * t_vac / (N-1);
+      const sqrt_h = Math.max(Math.sqrt(h0) - k*ti, 0);
+      t.push(ti);
+      y.push(sqrt_h*sqrt_h);
+    }
+    return {t, y, t_vac};
+  }
+
+  // ---------- Gráfico ----------
+  const ctx = document.getElementById('chart').getContext('2d');
+  let chart;
+
+  function updateChart(A, a, g, h0, N){
+    const {t, y, t_vac} = computeSeries(A, a, g, h0, N);
+    tvacOut.textContent = t_vac.toFixed(4) + ' s';
+
+    // Pares (x,y) para eje-X real
+    const points = t.map((ti, i) => ({ x: ti, y: y[i] }));
+
+    if (!chart){
+      chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          datasets: [{
+            label: 'h(t)',
+            data: points,
+            borderColor: '#3b82f6',
+            backgroundColor: 'rgba(59,130,246,0.1)',
+            borderWidth: 2,
+            tension: 0.1,
+            fill: true,
+            pointRadius: 0,
+            pointHoverRadius: 4
+          }]
+        },
+        options: {
+          parsing: false,               // ← importante con {x,y}
+          animation: { duration: 0 },
+          responsive: true,
+          interaction: { intersect: false, mode: 'index' },
+          scales: {
+            x: {
+              type: 'linear',
+              title: { display: true, text: 't (s)', color: '#6b7280', font: { size: 12 } },
+              grid: { color: 'rgba(255,255,255,0.1)', drawBorder: false },
+              ticks: { color: '#9ca3af', maxTicksLimit: 8 }
+            },
+            y: {
+              title: { display: true, text: 'h(t) (m)', color: '#6b7280', font: { size: 12 } },
+              suggestedMin: 0,
+              suggestedMax: Math.max(1, h0),
+              grid: { color: 'rgba(255,255,255,0.1)', drawBorder: false },
+              ticks: { color: '#9ca3af', maxTicksLimit: 6 }
+            }
+          },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              mode: 'index',
+              intersect: false,
+              backgroundColor: 'rgba(17,24,39,.95)',
+              titleColor: '#f3f4f6',
+              bodyColor: '#e5e7eb',
+              borderColor: '#374151',
+              borderWidth: 1,
+              cornerRadius: 6,
+              displayColors: false,
+              callbacks: {
+                title: (ctx) => `Tiempo: ${ctx[0].parsed.x.toFixed(2)} s`,
+                label: (ctx) => {
+                  const h = ctx.parsed.y;
+                  const v = Math.sqrt(2 * g * h); // [m/s]
+                  const Q = a * v;                // [m^3/s]
+                  return [
+                    `Altura: ${h.toFixed(4)} m`,
+                    `Velocidad salida: ${v.toFixed(4)} m/s`,
+                    `Caudal: ${Q.toExponential(4)} m³/s`
+                  ];
+                }
+              }
+            }
+          }
+        }
+      });
+    } else {
+      chart.data.datasets[0].data = points;
+      chart.options.scales.y.suggestedMax = Math.max(1, h0);
+      chart.update();
+    }
+  }
+
+  // ---------- Código Python "vivo" con tooltips ----------
+  const codeEl = document.getElementById('code-block');
+
+  function renderCode(A, a, g, h0){
+    const A_txt = A.toPrecision(6);
+    const a_txt = a.toExponential(6);
+    const g_txt = g.toPrecision(6);
+    const h0_txt = h0.toPrecision(6);
+
+    const codeHtml = `
+<span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+  data-bs-title="Librería fundamental para cálculo numérico en Python: <code>import numpy as np</code>">
+import numpy as <b>np</b></span>
+<span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+  data-bs-title="Librería estándar para visualización: <code>import matplotlib.pyplot as plt</code>">
+import matplotlib.pyplot as <b>plt</b></span>
+
+# parámetros del sistema
+<span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+  data-bs-title="Sección transversal del tanque: \\(A = ${A}\\,\\mathrm{m}^2\\)">
+A   = ${A_txt}   # m²</span>
+<span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+  data-bs-title="Área del orificio de descarga: \\(a = ${a}\\,\\mathrm{m}^2\\)">
+a   = ${a_txt}   # m²</span>
+<span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+  data-bs-title="Aceleración gravitacional: \\(g = ${g}\\,\\mathrm{m/s^2}\\)">
+g   = ${g_txt}   # m/s²</span>
+<span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+  data-bs-title="Altura inicial del fluido: \\(h_0 = ${h0}\\,\\mathrm{m}\\)">
+h0  = ${h0_txt}   # m</span>
+
+<span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+  data-bs-title="Ecuación de Torricelli: \\(\\tfrac{dh}{dt} = -\\tfrac{a}{A}\\sqrt{2gh}\\)">
+def h_anal(h0, a, A, t, g=9.8):</span>
+    <span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+      data-bs-title="Convierte entrada a array de numpy para vectorizar">
+    t = np.asarray(t)</span>
+    <span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+      data-bs-title="Constante: \\(k = \\tfrac{a}{2A}\\sqrt{2g}\\)">
+    k = (a/(2*A)) * np.sqrt(2*g)</span>
+    <span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+      data-bs-title="Solución: \\(\\sqrt{h(t)} = \\sqrt{h_0} - kt\\)">
+    sqrt_h = np.maximum(np.sqrt(h0) - k*t, 0.0)</span>
+    <span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+      data-bs-title="Altura: \\(h(t) = (\\sqrt{h_0}-kt)^2\\)">
+    return sqrt_h**2</span>
+
+# tiempo de vaciado completo
+<span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+  data-bs-title="\\(t_{\\text{vac}} = \\tfrac{2A}{a}\\sqrt{\\tfrac{h_0}{2g}}\\)">
+t_vac = (2*A/a) * np.sqrt(h0/(2*g))</span>
+print("t_vac ≈", t_vac, "s")
+
+# malla temporal y evaluación
+<span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+  data-bs-title="De 0 a \\(t_{\\text{vac}}\\) con 600 puntos">
+t_anal = np.linspace(0, t_vac, 600)</span>
+<span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+  data-bs-title="Evaluar la solución analítica">
+y_anal = h_anal(h0, a, A, t_anal)</span>
+
+# visualización
+<span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+  data-bs-title="Gráfico de \\(h(t)\\) vs \\(t\\)">
+plt.plot(t_anal, y_anal, color='blue', linewidth=2, label='Solución analítica')</span>
+<span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+  data-bs-title="\\(0 \\le y \\le \\max(1, h_0)\\)">
+plt.ylim(0, max(1, h0))</span>
+<span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+  data-bs-title="Etiqueta eje X">
+plt.xlabel("Tiempo t (s)")</span>
+<span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+  data-bs-title="Etiqueta eje Y">
+plt.ylabel("Altura h(t) (m)")</span>
+<span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+  data-bs-title="Título con LaTeX">
+plt.title("Evolución temporal $h(t)$ - Ley de Torricelli")</span>
+<span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+  data-bs-title="Cuadrícula suave">
+plt.grid(True, alpha=0.3, linestyle='--')</span>
+<span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+  data-bs-title="Leyenda">
+plt.legend()</span>
+<span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+  data-bs-title="Ajuste layout">
+plt.tight_layout()</span>
+<span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+  data-bs-title="Mostrar gráfico">
+plt.show()</span>`;
+
+    codeEl.textContent = '';
+    codeEl.innerHTML = codeHtml;
+
+    // Re-inicializar tooltips y reprocesar MathJax en el bloque de código
+    setTimeout(() => {
+      initTooltips();
+      if (window.MathJax && MathJax.typesetPromise) {
+        MathJax.typesetPromise([codeEl]).catch(() => {});
+      }
+    }, 100);
+  }
+
+  // ---------- Copiar código ----------
+  const copyBtn = document.getElementById('copy');
+  copyBtn.addEventListener('click', () => {
+    const tmp = document.createElement('textarea');
+    tmp.value = codeEl.innerText;
+    document.body.appendChild(tmp);
+    tmp.select();
+    document.execCommand('copy');
+    document.body.removeChild(tmp);
+    copyBtn.textContent = '¡Copiado!';
+    setTimeout(()=> copyBtn.textContent = 'Copiar código', 1200);
+  });
+
+  // ---------- Reset ----------
+  const resetBtn = document.getElementById('reset');
+  const defaults = { A:2.0, a:0.001, g:9.8, h0:1.0, N:600 };
+  resetBtn.addEventListener('click', () => {
+    AEl.value  = defaults.A;
+    aEl.value  = defaults.a;
+    gEl.value  = defaults.g;
+    h0El.value = defaults.h0;
+    nEl.value  = defaults.N;
+    updateAll();
+  });
+
+  // ---------- Ciclo de actualización ----------
+  function updateAll(){
+    const A  = Math.max(1e-12, parseFloat(AEl.value));
+    const a  = Math.max(1e-12, parseFloat(aEl.value));
+    const g  = Math.max(1e-12, parseFloat(gEl.value));
+    const h0 = Math.max(0, parseFloat(h0El.value));
+    const N  = Math.max(2, parseInt(nEl.value || '600', 10));
+
+    renderCode(A, a, g, h0);
+    updateChart(A, a, g, h0, N);
+  }
+
+  [AEl, aEl, gEl, h0El, nEl].forEach(inp => {
+    inp.addEventListener('input', updateAll);
+    inp.addEventListener('change', updateAll);
+  });
+
+  // ---------- LaTeX en el MODAL ----------
+const explanationModal = document.getElementById('explicacionModal');
+if (explanationModal){
+  explanationModal.addEventListener('shown.bs.modal', () => {
+    if (window.MathJax && MathJax.typesetPromise) {
+      MathJax.typesetPromise([explanationModal]).catch(() => {});
+    }
+  });
+}
+
+
+  // Inicialización
+  initTooltips();
+  updateAll();
+});
+</script>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+  <h1 class="h3 mb-2">Métodos Analitico  — con Python</h1>
+  <p class="lead-note mb-3">
+    Edita los parámetros y observa cómo cambian \(t_{\text{vac}}\), la curva \(h(t)\) y el
+    <em>snippet</em> de código Python con tooltips matemáticos.
+    <span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+      data-bs-title="Modelo basado en la ecuación de Torricelli: \\(\\frac{dh}{dt} = -\\frac{a}{A}\\sqrt{2gh}\\)">
+      (Más info)
+    </span>
+  </p>
+
+  <!-- Inputs izquierda / gráfico derecha -->
+  <div class="row g-3 align-items-stretch mb-4">
+    <div class="col-lg-4">
+      <div class="card h-100">
+        <div class="card-body">
+          <h6 class="text-secondary mb-3">
+            Parámetros del modelo
+            <span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+              data-bs-title="Parámetros del sistema tanque–orificio">
+              ⓘ
+            </span>
+          </h6>
+
+          <div class="param-grid">
+            <div>
+              <label class="form-label">
+                A (m²) — área del tanque
+                <span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+                  data-bs-title="Sección transversal del tanque cilíndrico: \\(A\\)">
+                  ⓘ
+                </span>
+              </label>
+              <input type="number" step="any" class="form-control" id="paramA" value="2.0">
+            </div>
+
+            <div>
+              <label class="form-label">
+                a (m²) — área del orificio
+                <span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+                  data-bs-title="Área de descarga: \\(a \\ll A\\)">
+                  ⓘ
+                </span>
+              </label>
+              <input type="number" step="any" class="form-control" id="parama" value="0.001">
+            </div>
+
+            <div>
+              <label class="form-label">
+                g (m/s²)
+                <span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+                  data-bs-title="Aceleración gravitacional: \\(g \\approx 9.8\\,\\mathrm{m/s^2}\\)">
+                  ⓘ
+                </span>
+              </label>
+              <input type="number" step="any" class="form-control" id="paramg" value="9.8">
+            </div>
+
+            <div>
+              <label class="form-label">
+                h₀ (m)
+                <span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+                  data-bs-title="Altura inicial: \\(h(0)=h_0\\)">
+                  ⓘ
+                </span>
+              </label>
+              <input type="number" step="any" class="form-control" id="paramh0" value="1.0">
+            </div>
+
+            <div class="full">
+              <label class="form-label">
+                N (puntos de discretización)
+                <span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+                  data-bs-title="Número de puntos en la malla temporal">
+                  ⓘ
+                </span>
+              </label>
+              <input type="number" step="1" min="50" class="form-control" id="paramN" value="600">
+            </div>
+          </div>
+
+          <div class="mt-3 d-flex justify-content-between align-items-center">
+            <button class="btn btn-outline-secondary btn-sm" id="reset" type="button">Restablecer</button>
+            <span class="badge bg-primary fs-6">
+              \(t_{\text{vac}}\) = <span id="tvac">—</span>
+              <span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+                data-bs-title="\\(t_{\\text{vac}} = \\tfrac{2A}{a}\\sqrt{\\tfrac{h_0}{2g}}\\)">
+                ⓘ
+              </span>
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-8">
+      <div class="card h-100">
+        <div class="card-body">
+          <h6 class="text-secondary mb-3">
+            Evolución temporal \(h(t)\)
+            <span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+              data-bs-title="\\(h(t)=\\big(\\sqrt{h_0}-\\tfrac{a}{2A}\\sqrt{2g}\\,t\\big)^2\\)">
+              ⓘ
+            </span>
+          </h6>
+
+          <div class="chart-container">
+            <canvas id="chart" height="120"></canvas>
+          </div>
+
+          <div class="chart-legend">
+            <div class="legend-item">
+              <div class="legend-color" style="background-color:#3b82f6;"></div>
+              <span>
+                \(h(t)\) — Altura del fluido
+                <span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+                  data-bs-title="Evolución de la altura según Torricelli">
+                  ⓘ
+                </span>
+              </span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Barra de acciones sobre el código -->
+  <div class="d-flex justify-content-between align-items-center mb-2">
+    <h6 class="mb-0 text-secondary">Código Python con anotaciones</h6>
+    <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#explicacionModal">
+      Ver explicación del código
+    </button>
+  </div>
+
+  <!-- Código Python con tooltips LaTeX -->
+  <div class="code-wrap mb-4">
+    <button class="copy-btn" id="copy" type="button">Copiar código</button>
+    <pre class="code"><code id="code-block"></code></pre>
+  </div>
+
+  <p class="text-muted mt-2" style="font-size:.9rem">
+    <span class="tt" data-bs-toggle="tooltip" data-bs-html="true"
+      data-bs-title="Pasa el cursor sobre elementos subrayados para ver explicaciones matemáticas">
+      💡 Pasa el cursor sobre el código y los iconos ⓘ para ver fórmulas en LaTeX.
+    </span>
+  </p>
+</div>
+
+<!-- ===== Modal de explicación ===== -->
+<div class="modal fade" id="explicacionModal" tabindex="-1" aria-labelledby="explicacionLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="explicacionLabel">De dónde sale \(k\) y por qué el código despeja \(h(t)\)</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+    
+
+<div class="modal-body">
+  <p><strong>1) Velocidad de salida (Torricelli)</strong><br>
+    Para un orificio pequeño a profundidad \(h\), la velocidad de salida es
+    \( v=\sqrt{2gh} \).
+  </p>
+
+  <p><strong>2) Continuidad (balance de volumen)</strong><br>
+    El caudal que sale es \(Q=a\,v=a\sqrt{2gh}\). El volumen del tanque es \(V=A\,h\)
+    (tanque cilíndrico de sección constante \(A\)). Por conservación:
+    \[
+      \frac{dV}{dt}=A\frac{dh}{dt}=-Q=-a\sqrt{2gh}.
+    \]
+    Entonces obtenemos la ecuación diferencial:
+    \[
+      \frac{dh}{dt}=-\frac{a}{A}\sqrt{2gh}.
+    \]
+  </p>
+
+  <p><strong>3) Linealizando con \(\sqrt{h}\)</strong><br>
+    Separando variables:
+    \[
+      \frac{dh}{\sqrt{h}}=-\frac{a}{A}\sqrt{2g}\,dt.
+    \]
+    Integramos y usamos \(h(0)=h_0\):
+    \[
+      2\sqrt{h(t)}= -\frac{a}{A}\sqrt{2g}\,t + 2\sqrt{h_0}.
+    \]
+    Por tanto:
+    \[
+      \sqrt{h(t)}=\sqrt{h_0}-\underbrace{\Big(\frac{a}{2A}\sqrt{2g}\Big)}_{k}\,t,
+      \qquad
+      h(t)=\big(\sqrt{h_0}-k\,t\big)^2.
+    \]
+  </p>
+
+  <p><strong>¿Qué es \(k\)? (significado físico)</strong><br>
+    \( k=\frac{a}{2A}\sqrt{2g} \) tiene unidades de \([\text{m}^{1/2}/\text{s}]\) y es la
+    <em>pendiente</em> con la que decrece \(\sqrt{h}\) en el tiempo.
+    Resume el efecto de gravedad \(g\), tamaño del orificio \(a\) y “anchura” del tanque \(A\).
+    <ul>
+      <li>Mayor \(a\) ⇒ mayor \(k\) ⇒ vaciado más rápido.</li>
+      <li>Mayor \(A\) ⇒ menor \(k\) ⇒ vaciado más lento.</li>
+    </ul>
+  </p>
+
+  <p><strong>4) Tiempo de vaciado</strong><br>
+    Como \(h(t_{\text{vac}})=0\), entonces \(\sqrt{h_0}-k\,t_{\text{vac}}=0\) y
+    \[
+      t_{\text{vac}}=\frac{\sqrt{h_0}}{k}
+      =\frac{2A}{a}\sqrt{\frac{h_0}{2g}}.
+    \]
+  </p>
+
+  <div class="alert alert-secondary mt-3" role="alert" style="font-size:.9rem">
+    <strong>Supuestos del modelo:</strong> \(a\ll A\), fluido incompresible,
+    sin pérdidas viscosas ni coeficiente de descarga (\(C_d\approx 1\)).
+    Para mayor realismo, usa \(Q=C_d\,a\sqrt{2gh}\).
+  </div>
+</div>
+
+
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- ===== Fin modal ===== -->
+{% endblock %}

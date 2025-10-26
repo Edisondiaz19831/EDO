@@ -14,36 +14,162 @@
     .mathmono {
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
     }
+
+    /* Solo para las dos ecuaciones largas de Bernoulli */
+    .math-noscroll {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      max-width: 100%;
+      padding-bottom: .25rem;
+    }
+    .math-noscroll mjx-container {
+      display: block;
+      max-width: 100%;
+      overflow-x: auto;
+      overflow-y: hidden;
+      text-align: center;
+    }
+    @media (max-width: 576px) {
+      .math-noscroll { font-size: 0.95rem; }
+    }
+
+    .math-inline-wrap {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      max-width: 100%;
+      display: block;
+      text-align: center;
+      padding-bottom: .25rem;
+    }
+
+    .math-inline-wrap mjx-container {
+      display: inline-block;
+      max-width: 100%;
+      overflow-x: auto;
+      overflow-y: hidden;
+      text-align: center;
+    }
+
+    @media (max-width: 576px) {
+      .math-inline-wrap { font-size: 0.95rem; }
+    }
+
+    /* Estilos para los dropdowns */
+    .dropdown-submenu {
+      position: relative;
+    }
+
+    .dropdown-submenu > .dropdown-menu {
+      top: 0;
+      left: 100%;
+      margin-top: -6px;
+      margin-left: -1px;
+      border-radius: 0 6px 6px 6px;
+    }
+
+    .dropdown-submenu .dropdown-toggle::after {
+      transform: rotate(-90deg);
+      margin-left: auto;
+    }
+
+    /* Para pantallas móviles */
+    @media (max-width: 991.98px) {
+      .dropdown-submenu > .dropdown-menu {
+        position: static;
+        margin: 0.25rem 0 0.25rem 1rem;
+        border-left: 2px solid #dee2e6;
+        border-radius: 0;
+      }
+      
+      .dropdown-submenu .dropdown-toggle::after {
+        transform: rotate(0deg);
+      }
+    }
+
+    /* Mejorar la indicación visual del estado activo */
+    .dropdown-item.active {
+      background-color: #0d6efd;
+      color: white;
+    }
+
+    /* Transiciones suaves */
+    .dropdown-menu {
+      transition: all 0.2s ease-in-out;
+    }
+
+    body { 
+      padding-top: 80px;
+    }
+
+    .footer-modern {
+      background: #f9fafb;
+      border-top: 1px solid #e5e7eb;
+      padding: 2rem 0;
+    }
+
+    .footer-icons {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+
+    .badge-soft {
+      background: #eef2ff;
+      color: #1e2a78;
+      border: 1px solid #c7d2fe;
+      border-radius: 12px;
+      padding: 0.4rem 0.9rem;
+      font-size: 0.85rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      transition: all 0.25s ease;
+    }
+
+    .badge-soft:hover {
+      background: #e0e7ff;
+      transform: translateY(-2px);
+    }
+
+    .footer-modern p {
+      font-size: 0.9rem;
+    }
+
+    .footer-modern small {
+      font-size: 0.8rem;
+    }
+
+    .code { 
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; 
+    }
   </style>
+  
   <!-- Bootstrap 5 -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
   <!-- MathJax -->
   <script>
-    window.MathJax = {
-      tex: {
-        packages: {'[+]': ['textmacros']},
-        inlineMath: [['\\(', '\\)']],
-        displayMath: [['$$','$$']],
-        processEscapes: true
-      }
-    };
+  window.MathJax = {
+    tex: {
+      packages: {'[+]': ['textmacros']},
+      inlineMath: [['\\(', '\\)']],
+      displayMath: [['\\[','\\]'], ['$$','$$']],
+      processEscapes: true
+    }
+  };
   </script>
   <script id="MathJax-script" async
           src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
 
-  <style>
-    .code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
-  </style>
   {% block head %}{% endblock %}
 </head>
 <body>
-
-<!-- NAVBAR FIJO Y MÁS ALTO -->
+<!-- NAVBAR FIJO -->
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top shadow-sm py-3">
   <div class="container">
-    <!-- LOGO CON FÓRMULAS (Solución recomendada) -->
+    <!-- LOGO -->
     <a class="navbar-brand d-flex align-items-center" href="{{ url_for('index') }}">
       <div class="text-center me-3">
         <div class="text-warning small lh-1">\(\rho g h\)</div>
@@ -59,41 +185,137 @@
 
     <div class="collapse navbar-collapse" id="navbarNav">
       <ul class="navbar-nav ms-auto">
+
         <li class="nav-item">
           <a class="nav-link {% if request.endpoint == 'index' %}active{% endif %}" href="{{ url_for('index') }}">
-            Ecuacion de Bernoulli/Torricelli
+            Ecuación de Bernoulli/Torricelli
           </a>
         </li>
+
         <li class="nav-item">
           <a class="nav-link {% if request.endpoint == 'continuidad' %}active{% endif %}" href="{{ url_for('continuidad') }}">
             Continuidad
           </a>
         </li>
-        <li class="nav-item">
-          <a class="nav-link {% if request.endpoint == 'integracion' %}active{% endif %}" href="{{ url_for('integracion') }}">
-            Integración h(t)[Caso Cilindro]
+
+        <!-- DESPLEGABLE DE INTEGRACIÓN -->
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle {% if request.endpoint in ['integracion', 'modelo_lineal'] %}active{% endif %}" 
+             href="#" id="integracionDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+            Integración
           </a>
+          <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="integracionDropdown">
+            <li>
+              <a class="dropdown-item {% if request.endpoint == 'integracion' %}active{% endif %}" 
+                 href="{{ url_for('integracion') }}">
+                Caso Cilindro
+              </a>
+            </li>
+            <li>
+              <a class="dropdown-item {% if request.endpoint == 'modelo_lineal' %}active{% endif %}" 
+                 href="{{ url_for('modelo_lineal') }}">
+                Caso Cono
+              </a>
+            </li>
+          </ul>
         </li>
-        <li class="nav-item">
-          <a class="nav-link text-warning {% if request.endpoint == 'modelo_lineal' %}active{% endif %}" href="{{ url_for('modelo_lineal') }}">
-            [Caso Conos]
+
+        <!-- DESPLEGABLE DE APLICACIONES (multi-nivel) -->
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle {% if request.endpoint in [
+              'metodo_analiticoc','metodo_numericoc','barrido_area',
+              'cono_perfecto_analitico','cono_perfecto_numerico',
+              'cono_truncado_analitico','cono_truncado_numerico','barrido_areac'
+            ] %}active{% endif %}"
+             href="#" id="aplicacionesDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+            Aplicaciones
           </a>
+
+          <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="aplicacionesDropdown">
+
+            <!-- Submenú: Cilindro -->
+            <li class="dropdown-submenu">
+              <a class="dropdown-item dropdown-toggle" href="#">Cilindro</a>
+              <ul class="dropdown-menu">
+                <li>
+                  <a class="dropdown-item {% if request.endpoint == 'metodo_analiticoc' %}active{% endif %}"
+                     href="{{ url_for('metodo_analiticoc') }}">
+                    Método analítico
+                  </a>
+                </li>
+                <li>
+                  <a class="dropdown-item {% if request.endpoint == 'metodo_numericoc' %}active{% endif %}"
+                     href="{{ url_for('metodo_numericoc') }}">
+                    Método numérico
+                  </a>
+                </li>
+                <li>
+                  <a class="dropdown-item {% if request.endpoint == 'barrido_area' %}active{% endif %}"
+                     href="{{ url_for('barrido_area') }}">
+                    Áreas de salida
+                  </a>
+                </li>
+              </ul>
+            </li>
+
+            <!-- Submenú: Cono perfecto -->
+            <li class="dropdown-submenu">
+              <a class="dropdown-item dropdown-toggle" href="#">Cono perfecto</a>
+              <ul class="dropdown-menu">
+                <li>
+                  <a class="dropdown-item {% if request.endpoint == 'cono_perfecto_analitico' %}active{% endif %}"
+                     href="{{ url_for('cono_perfecto_analitico') }}">
+                    Método analítico
+                  </a>
+                </li>
+                <li>
+                  <a class="dropdown-item {% if request.endpoint == 'cono_perfecto_numerico' %}active{% endif %}"
+                     href="{{ url_for('cono_perfecto_numerico') }}">
+                    Método numérico
+                  </a>
+                </li>
+              </ul>
+            </li>
+
+            <!-- Submenú: Cono truncado -->
+            <li class="dropdown-submenu">
+              <a class="dropdown-item dropdown-toggle" href="#">Cono truncado</a>
+              <ul class="dropdown-menu">
+                <li>
+                  <a class="dropdown-item {% if request.endpoint == 'cono_truncado_analitico' %}active{% endif %}"
+                     href="{{ url_for('cono_truncado_analitico') }}">
+                    Método analítico
+                  </a>
+                </li>
+                <li>
+                  <a class="dropdown-item {% if request.endpoint == 'cono_truncado_numerico' %}active{% endif %}"
+                     href="{{ url_for('cono_truncado_numerico') }}">
+                    Método numérico
+                  </a>
+                </li>
+                <li>
+                  <a class="dropdown-item {% if request.endpoint == 'barrido_areac' %}active{% endif %}"
+                     href="{{ url_for('barrido_areac') }}">
+                    Áreas de salida
+                  </a>
+                </li>
+              </ul>
+            </li>
+
+          </ul>
         </li>
+
       </ul>
     </div>
   </div>
 </nav>
 
-<!-- Compensa la altura del navbar fijo -->
-<style>
-  body { padding-top: 80px; }  /* Ajusta este valor según se vea (70–90px) */
-</style>
-<!-- FIN NAVBAR -->
-
+<!-- CONTENIDO PRINCIPAL -->
 <main class="container mb-5">
   {% block content %}{% endblock %}
 </main>
 
+<!-- FOOTER -->
 <footer class="footer-modern mt-5">
   <div class="container text-center">
     <div class="footer-icons mb-3">
@@ -108,7 +330,7 @@
       </span>
     </div>
 
-    <p class="mb-1 text-muted small">Desarrollado con pasión por el aprendizaje </p>
+    <p class="mb-1 text-muted small">Desarrollado con pasión por el aprendizaje</p>
     <small class="text-secondary">© 2025 · Modelo Lineal Dinámico</small>
   </div>
 </footer>
@@ -116,47 +338,57 @@
 <!-- Bootstrap Icons -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
 
-<style>
-.footer-modern {
-  background: #f9fafb;
-  border-top: 1px solid #e5e7eb;
-  padding: 2rem 0;
-}
+<!-- JavaScript para manejar los dropdowns -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Manejo de submenús en dropdowns
+    var dropdownElements = document.querySelectorAll('.dropdown-submenu');
+    
+    dropdownElements.forEach(function(element) {
+        var trigger = element.querySelector('.dropdown-toggle');
+        
+        trigger.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            var submenu = this.nextElementSibling;
+            var isOpen = submenu.classList.contains('show');
+            
+            // Cerrar todos los submenús primero
+            document.querySelectorAll('.dropdown-submenu .dropdown-menu').forEach(function(menu) {
+                menu.classList.remove('show');
+            });
+            
+            // Abrir el submenú actual si no estaba abierto
+            if (!isOpen) {
+                submenu.classList.add('show');
+            }
+        });
+    });
 
-.footer-icons {
-  display: flex;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 1rem;
-}
+    // Cerrar submenús cuando se hace clic fuera
+    document.addEventListener('click', function(e) {
+        if (!e.target.matches('.dropdown-submenu, .dropdown-submenu *')) {
+            document.querySelectorAll('.dropdown-submenu .dropdown-menu').forEach(function(menu) {
+                menu.classList.remove('show');
+            });
+        }
+    });
 
-.badge-soft {
-  background: #eef2ff;
-  color: #1e2a78;
-  border: 1px solid #c7d2fe;
-  border-radius: 12px;
-  padding: 0.4rem 0.9rem;
-  font-size: 0.85rem;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  transition: all 0.25s ease;
-}
+    // Cerrar submenús cuando se cambia de dropdown principal
+    document.querySelectorAll('.nav-item.dropdown').forEach(function(dropdown) {
+        dropdown.addEventListener('hidden.bs.dropdown', function() {
+            this.querySelectorAll('.dropdown-submenu .dropdown-menu').forEach(function(menu) {
+                menu.classList.remove('show');
+            });
+        });
+    });
+});
+</script>
 
-.badge-soft:hover {
-  background: #e0e7ff;
-  transform: translateY(-2px);
-}
+{% if config.get('DEBUG') %}
+<script src="{{ url_for('static', filename='main.js') }}"></script>
+{% endif %}
 
-.footer-modern p {
-  font-size: 0.9rem;
-}
-
-.footer-modern small {
-  font-size: 0.8rem;
-}
-</style>
-
-<script src="{{ url_for('static', filename='main.js') }}" defer></script>
 </body>
 </html>
