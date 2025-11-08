@@ -1,0 +1,320 @@
+{% extends "base.html" %}
+{% block title %}Cuerda sobre la mesa — Explicación del código{% endblock %}
+
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+<style>
+  .code-wrap{
+    background:#0b1020;
+    color:#e5e7eb;
+    border-radius:10px;
+    padding:1rem 1.25rem;
+    border:1px solid #111827;
+    overflow-x:auto;
+    font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    line-height:1.45;
+    position:relative;
+  }
+  .tt{
+    cursor:help;
+    text-decoration:underline dotted;
+    border-bottom:1px dotted #60a5fa;
+    color:#93c5fd;
+  }
+  .tt:hover{ color:#bfdbfe; }
+  .copy-btn{
+    position:absolute;
+    top:8px;
+    right:8px;
+    font-size:.8rem;
+    background:#111827;
+    color:#e5e7eb;
+    border:1px solid #374151;
+    border-radius:6px;
+    padding:.2rem .6rem;
+  }
+  .param-grid{
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:10px;
+  }
+  .mathmono{
+    font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  }
+  .legend-pill{
+    display:inline-flex;
+    align-items:center;
+    gap:.35rem;
+    padding:.2rem .5rem;
+    border-radius:9999px;
+    border:1px solid #e5e7eb;
+    background:#f8fafc;
+    font-size:.8rem;
+  }
+  .dot{
+    width:.6rem;
+    height:.6rem;
+    border-radius:999px;
+    display:inline-block;
+    background:#3b82f6;
+  }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  // Tooltips con MathJax dentro
+  const initTooltips = () => {
+    document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => {
+      new bootstrap.Tooltip(el, {
+        html:true,
+        trigger:'hover focus',
+        sanitize:false,
+        container:'body',
+        delay:{show:250, hide:100}
+      });
+      el.addEventListener('shown.bs.tooltip', () => {
+        const id = el.getAttribute('aria-describedby');
+        const tip = id && document.getElementById(id);
+        if (tip && window.MathJax?.typesetPromise) {
+          const inner = tip.querySelector('.tooltip-inner');
+          if (inner) MathJax.typesetPromise([inner]).catch(()=>{});
+        }
+      });
+    });
+  };
+
+  // Parámetros
+  const gEl  = document.getElementById('param_g');
+  const LEl  = document.getElementById('param_L');
+  const x0El = document.getElementById('param_x0');
+  const v0El = document.getElementById('param_v0');
+
+  const tChart = document.getElementById('chart_vx').getContext('2d');
+  let chart = null;
+
+  function v_of_x(g,L,x0,v0,x){
+    if (!(L>0)) return NaN;
+    const val = v0*v0 + (g/L)*(x*x - x0*x0);
+    return val >= 0 ? Math.sqrt(val) : NaN;
+  }
+
+  function updateChart(){
+    const g  = parseFloat(gEl.value)  || 9.8;
+    const L  = parseFloat(LEl.value)  || 1.0;
+    const x0 = parseFloat(x0El.value) || 0.10;
+    const v0 = parseFloat(v0El.value) || 0.01;
+
+    const N = 80;
+    const labels = [];
+    const data   = [];
+
+    for(let i=0;i<=N;i++){
+      const x = x0 + (L - x0)*i/N;
+      labels.push(x);
+      data.push(v_of_x(g,L,x0,v0,x));
+    }
+
+    if(!chart){
+      chart = new Chart(tChart, {
+        type:'line',
+        data:{
+          labels: labels,
+          datasets:[
+            {
+              label:'v(x) = √(v₀² + (g/L)(x² - x₀²))',
+              data: data,
+              tension:0.15,
+              pointRadius:0
+            }
+          ]
+        },
+        options:{
+          animation:false,
+          responsive:true,
+          scales:{
+            x:{ title:{display:true, text:'x [m]'} },
+            y:{ title:{display:true, text:'v(x) [m/s]'}, beginAtZero:true }
+          },
+          plugins:{
+            legend:{ display:true }
+          }
+        }
+      });
+    } else {
+      chart.data.labels = labels;
+      chart.data.datasets[0].data = data;
+      chart.update();
+    }
+
+    if(window.MathJax?.typesetPromise){
+      MathJax.typesetPromise().catch(()=>{});
+    }
+  }
+
+  // Código estilo clase con tooltips
+  const codeEl = document.getElementById('code-block');
+  function renderCode(){
+    const codeHtml = `
+<span class="tt" data-bs-toggle="tooltip" data-bs-title="Librerías científicas estándar en Python para trabajar con arreglos, gráficas y EDOs.">
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.integrate import odeint
+</span>
+
+<span class="tt" data-bs-toggle="tooltip" data-bs-title="Parámetros físicos de la cuerda: longitud total L, masa total m, densidad lineal μ = m/L y gravedad g.">
+m = 0.5      # kg  (masa total de la cuerda)
+L = 1.0      # m   (longitud total)
+g = 9.8      # m/s^2
+mu = m / L   # kg/m
+</span>
+
+<span class="tt" data-bs-toggle="tooltip" data-bs-title="Condiciones iniciales: x0 es la longitud que ya cuelga y v0 la velocidad inicial del extremo.">
+x0 = 0.10    # m
+v0 = 0.01    # m/s
+</span>
+
+<span class="tt" data-bs-toggle="tooltip" data-bs-title="Definimos la ecuación diferencial en la forma dv/dx = (g/L) * x / v, obtenida a partir de la conservación de cantidad de movimiento y el cambio de variable t → x.">
+def modelo(v, x):
+    return (g/L) * (x / v)
+</span>
+
+<span class="tt" data-bs-toggle="tooltip" data-bs-title="Construimos un arreglo de posiciones x desde x0 hasta L para evaluar la solución numérica.">
+x_vals = np.linspace(x0, L, 200)
+</span>
+
+<span class="tt" data-bs-toggle="tooltip" data-bs-title="Usamos odeint para integrar dv/dx numéricamente, partiendo del valor inicial v0 en x0.">
+v_num = odeint(modelo, v0, x_vals)
+</span>
+
+<span class="tt" data-bs-toggle="tooltip" data-bs-title="Solución analítica deducida en clase: v(x) = √(v0² + (g/L)(x² - x0²)).">
+v_anal = np.sqrt(v0**2 + (g/L) * (x_vals**2 - x0**2))
+</span>
+
+<span class="tt" data-bs-toggle="tooltip" data-bs-title="Graficamos ambas curvas para comparar el método numérico (odeint) con la solución analítica. Si coinciden, nuestro modelo físico y la implementación son correctos.">
+plt.plot(x_vals, v_num, label='Numérica (odeint)')
+plt.plot(x_vals, v_anal, '--', label='Analítica')
+plt.xlabel('x [m]')
+plt.ylabel('v(x) [m/s]')
+plt.legend()
+plt.grid(True, alpha=0.3, linestyle='--')
+plt.show()
+</span>
+`;
+    codeEl.textContent = '';
+    codeEl.innerHTML = codeHtml;
+    setTimeout(() => {
+      initTooltips();
+      if(window.MathJax?.typesetPromise){
+        MathJax.typesetPromise([codeEl]).catch(()=>{});
+      }
+    }, 50);
+  }
+
+  // Botón copiar
+  const copyBtn = document.getElementById('copy');
+  copyBtn.addEventListener('click', () => {
+    const tmp = document.createElement('textarea');
+    tmp.value = codeEl.innerText;
+    document.body.appendChild(tmp);
+    tmp.select();
+    document.execCommand('copy');
+    document.body.removeChild(tmp);
+    copyBtn.textContent = '¡Copiado!';
+    setTimeout(() => copyBtn.textContent = 'Copiar código', 1200);
+  });
+
+  // Eventos parámetros
+  [gEl, LEl, x0El, v0El].forEach(el => {
+    el.addEventListener('input', updateChart);
+    el.addEventListener('change', updateChart);
+  });
+
+  // Init
+  renderCode();
+  updateChart();
+});
+</script>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+  <h1 class="h3 mb-2">Cuerda sobre la mesa — Cómo se programa el modelo</h1>
+  <p class="text-muted mb-3">
+    Esta página explica el código típico de la sesión de Jupyter para el sistema
+    de <strong>cuerda parcialmente colgante</strong>, conectando cada línea con el modelo físico:
+    \[
+      v \frac{dv}{dx} = \frac{g}{L}x
+      \quad\Rightarrow\quad
+      v(x) = \sqrt{v_0^2 + \frac{g}{L}(x^2 - x_0^2)}.
+    \]
+  </p>
+
+  <div class="row g-3 align-items-stretch mb-4">
+    <!-- Parámetros + gráfica -->
+    <div class="col-lg-4">
+      <div class="card h-100">
+        <div class="card-body">
+          <h6 class="text-secondary mb-2">Parámetros del modelo</h6>
+          <div class="param-grid">
+            <div>
+              <label class="form-label">g [m/s²]</label>
+              <input type="number" step="0.01" class="form-control" id="param_g" value="9.8">
+            </div>
+            <div>
+              <label class="form-label">L [m]</label>
+              <input type="number" step="0.01" class="form-control" id="param_L" value="1.0">
+            </div>
+            <div>
+              <label class="form-label">x₀ [m]</label>
+              <input type="number" step="0.01" class="form-control" id="param_x0" value="0.10">
+            </div>
+            <div>
+              <label class="form-label">v₀ [m/s]</label>
+              <input type="number" step="0.001" class="form-control" id="param_v0" value="0.01">
+            </div>
+          </div>
+          <hr class="my-3">
+          <div class="legend-pill">
+            <span class="dot"></span>
+            <span>Curva \(v(x)\) actualizada al cambiar parámetros</span>
+          </div>
+          <p class="small text-muted mt-2 mb-0">
+            Esta gráfica reproduce lo que haría el notebook:
+            muestra cómo crece la velocidad a medida que aumenta la longitud colgante \(x\).
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-8">
+      <div class="card h-100">
+        <div class="card-body">
+          <h6 class="text-secondary mb-2">Gráfica \(v(x)\) según la solución analítica</h6>
+          <canvas id="chart_vx" height="140"></canvas>
+          <p class="small text-muted mt-2 mb-0">
+            El código numérico con <code>odeint</code> debe dar una curva que coincide con esta
+            solución analítica. Esa coincidencia valida tanto la deducción física como
+            la implementación computacional.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Código explicado -->
+  <div class="code-wrap mb-4">
+    <button class="copy-btn" id="copy" type="button">Copiar código</button>
+    <pre class="code"><code id="code-block"></code></pre>
+  </div>
+
+  <div class="alert alert-info small">
+    💡 Sugerencia didáctica:
+    abre primero la página interactiva de la cuerda
+    (<code>/cuerda-masa-variable</code>) para jugar con el modelo,
+    y luego esta página para entender línea por línea el código que
+    implementa la ecuación diferencial.
+  </div>
+</div>
+{% endblock %}

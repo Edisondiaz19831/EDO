@@ -1,0 +1,442 @@
+{% extends "base.html" %}
+{% block title %}Cuerda enrollada — Masa variable{% endblock %}
+
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+<style>
+  .rope-card-wrap { display:flex; gap:16px; align-items:flex-start; }
+  .rope-diagram-card { position:relative; }
+  .badge-soft {
+    background:#eef2ff; color:#1e2a78; border:1px solid #c7d2fe;
+    border-radius:8px; padding:2px 8px; font-size:.8rem;
+  }
+  .mathmono {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  }
+  .rope-diagram-container {
+    flex:0 0 auto;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    width:100%;
+  }
+  .rope-svg {
+    width:100%;
+    max-width:320px;
+    height:auto;
+  }
+  @media (max-width: 768px) {
+    .rope-card-wrap { flex-direction:column; align-items:center; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="row g-4">
+  <!-- IZQUIERDA: explicación teórica -->
+  <div class="col-lg-7">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h5 class="card-title mb-3">Cuerda enrollada (sistema con efecto geométrico)</h5>
+
+        <p class="text-muted small">
+          Ahora consideramos una cuerda que se desenrolla desde un carrete / cilindro.
+          A medida que se desenrolla:
+          <strong>aumenta la longitud colgante</strong> y cambia la relación entre fuerza, velocidad
+          y posición. Esto lleva a la ecuación diferencial:
+          \[
+            \frac{dv}{dx} = \frac{g}{v} - \frac{v}{x}.
+          \]
+        </p>
+
+        <hr>
+
+        <h6 class="mb-2">1. Idea física</h6>
+        <ul class="small">
+          <li>La parte colgante tiene masa \(m(x) = \mu x\).</li>
+          <li>Esa masa es acelerada por su peso: \(F_g = m(x)\,g = \mu g x\).</li>
+          <li>Al desenrollarse, la geometría introduce un “costo”: aparece un término que depende de \(v/x\).</li>
+        </ul>
+
+        <h6 class="mb-2">2. Ecuación de cantidad de movimiento</h6>
+        <p class="small mb-1">
+          De forma esquemática:
+          \[
+            \frac{d}{dt}(m v) = F_g + \text{(efectos de enrollamiento)}.
+          \]
+        </p>
+        <p class="small mb-1">
+          Con \(m = \mu x(t)\) y usando \( \dfrac{dx}{dt} = v \), se obtiene una relación entre \(v\) y \(x\)
+          que, tras reordenar, lleva a:
+          \[
+            v\frac{dv}{dx} + \frac{v^2}{x} = g.
+          \]
+        </p>
+
+        <h6 class="mb-2">3. Forma final</h6>
+        <p class="small mb-1">
+          Despejando:
+          \[
+            \frac{dv}{dx} = \frac{g}{v} - \frac{v}{x}.
+          \]
+        </p>
+        <p class="small mb-1">
+          El término \( \frac{g}{v} \) tiende a acelerar (como en la cuerda sobre la mesa),
+          mientras que \( -\frac{v}{x} \) actúa como freno geométrico:
+          cuanto más larga la cuerda desenrollada y más rápido va, más fuerte “penaliza” este término.
+        </p>
+
+        <h6 class="mb-2">4. Sin solución cerrada sencilla</h6>
+        <p class="small mb-1">
+          A diferencia del caso
+          \(\displaystyle v\frac{dv}{dx}=\frac{g}{L}x\),
+          aquí la ecuación es no lineal con dos términos mezclados. Es más natural
+          resolverla <strong>numéricamente</strong>, por ejemplo con un método tipo Runge–Kutta.
+        </p>
+
+        <hr>
+        <p class="small text-muted mb-0">
+          A la derecha ves:
+          <strong>(1)</strong> un carrete con la cuerda desenrollándose y
+          <strong>(2)</strong> la curva \(v(x)\) numérica. El tramo resaltado se actualiza con el slider.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- DERECHA: interacción -->
+  <div class="col-lg-5">
+    <div class="card shadow-sm rope-diagram-card">
+      <div class="card-body">
+        <h5 class="card-title mb-3">Cuerda enrollada — simulación numérica</h5>
+
+        <!-- Parámetros -->
+        <form class="row gy-2 mb-2" id="formEnrollada" onsubmit="return false;">
+          <div class="col-6">
+            <label class="form-label">g [m/s²]</label>
+            <input type="number" step="0.01" class="form-control" id="gInput" value="9.8">
+          </div>
+          <div class="col-6">
+            <label class="form-label">Longitud máx. \(L\) [m]</label>
+            <input type="number" step="0.01" class="form-control" id="LInput" value="1.0">
+          </div>
+          <div class="col-6">
+            <label class="form-label">\(x_0\) inicial [m]</label>
+            <input type="number" step="0.01" class="form-control" id="x0Input" value="0.10">
+          </div>
+          <div class="col-6">
+            <label class="form-label">\(v_0\) inicial [m/s]</label>
+            <input type="number" step="0.001" class="form-control" id="v0Input" value="0.10">
+            <div class="form-text small">Debe ser &gt;0 para evitar división por 0.</div>
+          </div>
+          <div class="col-12">
+            <label class="form-label">Longitud colgante \(x\) [m]</label>
+            <input type="range" class="form-range" id="xSlider" min="0.10" max="1.00" step="0.01" value="0.10">
+            <input type="number" class="form-control mt-1" id="xInput" step="0.01" value="0.10">
+            <div class="form-text small">
+              Mueve \(x\): se actualiza el dibujo y se resalta la curva hasta ese punto.
+            </div>
+          </div>
+        </form>
+
+        <!-- Badges -->
+        <div class="mb-2">
+          <span class="badge-soft">
+            x = <span id="xVal" class="mathmono">0.10</span> m
+          </span>
+          <span class="badge-soft ms-2">
+            v(x) ≈ <span id="vVal" class="mathmono">—</span> m/s
+          </span>
+        </div>
+
+        <!-- Diagrama -->
+        <div class="rope-card-wrap mt-2">
+          <div class="rope-diagram-container">
+            <svg id="ropeSvg" viewBox="0 0 260 220" class="rope-svg" aria-label="Cuerda enrollada">
+              <!-- Soporte -->
+              <rect x="20" y="80" width="220" height="8" fill="#e5e5e5" />
+              <!-- Carrete -->
+              <circle cx="170" cy="84" r="16" fill="#f3f4ff" stroke="#999" stroke-width="2" />
+              <circle cx="170" cy="84" r="4" fill="#999" />
+              <text x="150" y="60" font-size="9" fill="#555">Carrete</text>
+
+              <!-- Cuerda enrollada (arco simple) -->
+              <path id="ropeWrap"
+                    d="M154,84 A16,16 0 0,0 186,84"
+                    fill="none"
+                    stroke="#c77d1a"
+                    stroke-width="4"
+                    stroke-linecap="round" />
+
+              <!-- Cuerda colgante -->
+              <line id="ropeHang"
+                    x1="186" y1="84"
+                    x2="186" y2="84"
+                    stroke="#c77d1a"
+                    stroke-width="4"
+                    stroke-linecap="round" />
+
+              <!-- Flecha x -->
+              <line id="xArrow"
+                    x1="200" y1="84"
+                    x2="200" y2="160"
+                    stroke="#222"
+                    stroke-width="1.5"
+                    marker-end="url(#arrowDown)" />
+              <text id="xLabel"
+                    x="205" y="120"
+                    font-size="10"
+                    fill="#222">x</text>
+
+              <text x="25" y="72" font-size="9" fill="#555">Cuerda en el carrete</text>
+              <text x="120" y="200" font-size="9" fill="#555">Cuerda colgante</text>
+
+              <defs>
+                <marker id="arrowDown" markerWidth="8" markerHeight="8"
+                        refX="3" refY="2.5" orient="auto" markerUnits="strokeWidth">
+                  <path d="M0,0 L0,5 L5,2.5 z" fill="#222" />
+                </marker>
+              </defs>
+            </svg>
+          </div>
+        </div>
+
+        <hr>
+
+        <!-- Gráfica -->
+        <h6 class="mb-1">Curva numérica \(v(x)\)</h6>
+        <p class="small text-muted">
+          Línea azul: solución numérica de
+          \(\frac{dv}{dx} = \frac{g}{v} - \frac{v}{x}\).
+          Tramo resaltado: desde \(x_0\) hasta el \(x\) actual del slider.
+        </p>
+        <canvas id="vChart" height="180"></canvas>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const gEl = document.getElementById('gInput');
+  const LEl = document.getElementById('LInput');
+  const x0El = document.getElementById('x0Input');
+  const v0El = document.getElementById('v0Input');
+  const xSlider = document.getElementById('xSlider');
+  const xInput = document.getElementById('xInput');
+
+  const xValSpan = document.getElementById('xVal');
+  const vValSpan = document.getElementById('vVal');
+
+  const ropeHang = document.getElementById('ropeHang');
+  const xArrow = document.getElementById('xArrow');
+  const xLabel = document.getElementById('xLabel');
+
+  const vCanvas = document.getElementById('vChart');
+  let vChart = null;
+  let xs = [];
+  let vs = [];
+
+  // ===== Método RK4 para dv/dx =====
+  function f_dvdx(g, v, x){
+    // Evitar divisiones locas
+    if (x <= 0 || v === 0) return 0;
+    return (g / v) - (v / x);
+  }
+
+  function solveEnrollada(g, x0, v0, L, N=200){
+    const xArr = [];
+    const vArr = [];
+    if (!(L > x0) || !(v0 > 0)) {
+      return {x: xArr, v: vArr};
+    }
+    let x = x0;
+    let v = v0;
+    const dx = (L - x0) / N;
+
+    xArr.push(x);
+    vArr.push(v);
+
+    for (let i = 0; i < N; i++) {
+      const k1 = f_dvdx(g, v, x);
+      const k2 = f_dvdx(g, v + 0.5*dx*k1, x + 0.5*dx);
+      const k3 = f_dvdx(g, v + 0.5*dx*k2, x + 0.5*dx);
+      const k4 = f_dvdx(g, v + dx*k3, x + dx);
+
+      const dv = (dx/6)*(k1 + 2*k2 + 2*k3 + k4);
+      const v_next = v + dv;
+      const x_next = x + dx;
+
+      if (!isFinite(v_next) || v_next <= 0) break;
+
+      x = x_next;
+      v = v_next;
+      xArr.push(x);
+      vArr.push(v);
+    }
+
+    return {x: xArr, v: vArr};
+  }
+
+  // ===== Dibujo de la cuerda en el carrete =====
+  function drawRope(L, x){
+    if (!ropeHang) return;
+    if (!(L > 0)) return;
+
+    const topY = 84;
+    const attachX = 186;
+    const maxHang = 110;
+
+    let frac = x / L;
+    if (frac < 0) frac = 0;
+    if (frac > 1) frac = 1;
+
+    const hangLen = maxHang * frac;
+
+    ropeHang.setAttribute('x1', attachX);
+    ropeHang.setAttribute('y1', topY);
+    ropeHang.setAttribute('x2', attachX);
+    ropeHang.setAttribute('y2', topY + hangLen);
+
+    if (xArrow && xLabel) {
+      xArrow.setAttribute('x1', attachX + 10);
+      xArrow.setAttribute('x2', attachX + 10);
+      xArrow.setAttribute('y1', topY);
+      xArrow.setAttribute('y2', topY + hangLen);
+      xLabel.setAttribute('x', attachX + 15);
+      xLabel.setAttribute('y', topY + hangLen/2);
+    }
+  }
+
+  // ===== Gráfica v(x) + resaltado =====
+  function buildOrUpdateChart(curX){
+    if (!vCanvas || xs.length === 0) return;
+
+    const labels = xs;
+    const dataFull = vs.slice();
+
+    // dataset resaltado
+    const dataPartial = dataFull.map((val, i) => (xs[i] <= curX + 1e-9 ? val : null));
+
+    if (!vChart) {
+      vChart = new Chart(vCanvas.getContext('2d'), {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: 'v(x) numérica',
+              data: dataFull,
+              tension:0.15,
+              pointRadius:0
+            },
+            {
+              label: 'recorrido hasta x',
+              data: dataPartial,
+              tension:0.15,
+              pointRadius:0,
+              borderWidth:3
+            }
+          ]
+        },
+        options: {
+          animation: false,
+          responsive: true,
+          scales: {
+            x: { title: { display:true, text:'x [m]' } },
+            y: { title: { display:true, text:'v(x) [m/s]' }, beginAtZero:true }
+          },
+          plugins: {
+            legend: { display:true }
+          }
+        }
+      });
+    } else {
+      vChart.data.labels = labels;
+      vChart.data.datasets[0].data = dataFull;
+      vChart.data.datasets[1].data = dataPartial;
+      vChart.update();
+    }
+  }
+
+  // ===== Actualización global =====
+  function updateAll(fromSlider=false){
+    const g = parseFloat(gEl.value) || 9.8;
+    const L = parseFloat(LEl.value) || 1.0;
+    const x0 = parseFloat(x0El.value) || 0.10;
+    const v0 = parseFloat(v0El.value) || 0.10;
+
+    // Ajustar rangos del slider
+    if (L > x0) {
+      xSlider.min = x0;
+      xSlider.max = L;
+    }
+
+    let x;
+    if (fromSlider) {
+      x = parseFloat(xSlider.value);
+      xInput.value = xSlider.value;
+    } else {
+      x = parseFloat(xInput.value);
+      if (isNaN(x)) x = x0;
+      if (x < x0) x = x0;
+      if (x > L) x = L;
+      xInput.value = x.toFixed(2);
+      xSlider.value = x.toFixed(2);
+    }
+
+    // Resolver EDO numérica
+    const sol = solveEnrollada(g, x0, v0, L);
+    xs = sol.x;
+    vs = sol.v;
+
+    // Buscar v(x actual)
+    let vAtX = null;
+    if (xs.length > 0) {
+      for (let i = 1; i < xs.length; i++) {
+        if (xs[i] >= x) {
+          const x1 = xs[i-1], x2 = xs[i];
+          const v1 = vs[i-1], v2 = vs[i];
+          const t = (x - x1)/(x2 - x1 || 1);
+          vAtX = v1 + t*(v2 - v1);
+          break;
+        }
+      }
+      if (vAtX === null) vAtX = vs[vs.length-1];
+    }
+
+    // Badges
+    xValSpan.textContent = x.toFixed(2);
+    vValSpan.textContent = (vAtX && isFinite(vAtX)) ? vAtX.toFixed(4) : '—';
+
+    // Dibujo carrete
+    drawRope(L, x);
+
+    // Gráfica
+    buildOrUpdateChart(x);
+
+    // MathJax
+    if (window.MathJax && MathJax.typesetPromise) {
+      MathJax.typesetPromise().catch(()=>{});
+    }
+  }
+
+  // Eventos
+  [gEl, LEl, x0El, v0El].forEach(el => {
+    el.addEventListener('input', () => updateAll(false));
+    el.addEventListener('change', () => updateAll(false));
+  });
+
+  xSlider.addEventListener('input', () => updateAll(true));
+  xInput.addEventListener('input', () => updateAll(false));
+
+  // Init
+  updateAll(false);
+});
+</script>
+
+{% endblock %}

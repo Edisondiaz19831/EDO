@@ -1,0 +1,451 @@
+{% extends "base.html" %}
+{% block title %}Sistema globo–cuerda — Interactivo{% endblock %}
+
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<style>
+  .mathmono {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  }
+  .badge-soft {
+    background:#eef2ff;
+    color:#1e2a78;
+    border:1px solid #c7d2fe;
+    border-radius:8px;
+    padding:2px 8px;
+    font-size:.8rem;
+  }
+  .param-grid{
+    display:grid;
+    grid-template-columns:repeat(3,minmax(0,1fr));
+    gap:10px;
+  }
+  @media (max-width: 768px) {
+    .param-grid{ grid-template-columns:repeat(2,minmax(0,1fr)); }
+  }
+  .balloon-svg{
+    width:100%;
+    max-width:260px;
+    height:auto;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+
+  <!-- IZQUIERDA: explicación del modelo -->
+  <div class="col-lg-5">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h5 class="card-title mb-3">Sistema globo–cuerda: del modelo físico a la ecuación</h5>
+
+        <p class="small text-muted">
+          Consideramos un globo con helio que levanta una cuerda ligera.
+          A medida que sube, <strong>aumenta la longitud de cuerda levantada</strong> y por tanto la
+          masa que el globo está soportando.
+        </p>
+
+        <h6 class="mb-1">1. Variables y parámetros</h6>
+        <ul class="small">
+          <li>\(V_g\): volumen del globo.</li>
+          <li>\(\rho_a\), \(\rho_{\mathrm{He}}\): densidades del aire y del helio.</li>
+          <li>\(\mu\): masa por unidad de longitud de la cuerda.</li>
+          <li>\(b\): coeficiente de rozamiento lineal.</li>
+          <li>\(x(t)\): longitud de cuerda levantada (o altura del globo) [m].</li>
+          <li>\(v(t)=\dot x(t)\): velocidad vertical del globo [m/s].</li>
+        </ul>
+
+        <h6 class="mb-1">2. Fuerzas (eje vertical hacia arriba)</h6>
+        <p class="small mb-1">
+          <strong>Empuje:</strong> \(F_b = \rho_a g V_g\).
+        </p>
+        <p class="small mb-1">
+          <strong>Peso del helio:</strong> \(W_{\mathrm{He}} = \rho_{\mathrm{He}} g V_g\) (hacia abajo).
+        </p>
+        <p class="small mb-1">
+          <strong>Peso de la cuerda levantada:</strong>
+          si la longitud levantada es \(x\), entonces
+          \(m_{\text{cuerda}} = \mu x\) y \(W_{\text{cuerda}} = \mu x g\).
+        </p>
+        <p class="small mb-1">
+          <strong>Rozamiento:</strong> fuerza opuesta al movimiento,
+          \(F_r = -b v\).
+        </p>
+
+        <h6 class="mb-1">3. Masa efectiva (masa variable)</h6>
+        <p class="small mb-1">
+          Toda la masa que se mueve:
+          \[
+            m_\text{tot}(x) = \rho_{\mathrm{He}}V_g + \mu x.
+          \]
+        </p>
+
+        <h6 class="mb-1">4. Segunda Ley de Newton</h6>
+        <p class="small">
+          Sumando fuerzas (positivo hacia arriba):
+          \[
+          F_b - W_{\mathrm{He}} - W_{\text{cuerda}} + F_r
+          = m_\text{tot} \, \frac{dv}{dt}.
+          \]
+          Es decir:
+          \[
+          \rho_a g V_g
+          - \rho_{\mathrm{He}} g V_g
+          - \mu x g
+          - b v
+          = (\rho_{\mathrm{He}}V_g + \mu x)\frac{dv}{dt}.
+          \]
+        </p>
+
+        <p class="small">
+          Despejando:
+          \[
+          \frac{dv}{dt}
+          = \frac{V_g g(\rho_a - \rho_{\mathrm{He}})
+                  - \mu x g
+                  - b v}
+                 {V_g \rho_{\mathrm{He}} + \mu x}.
+          \]
+        </p>
+
+        <h6 class="mb-1">5. Sistema final (como en el notebook)</h6>
+        <p class="small mb-0">
+          \[
+          \boxed{
+          \begin{cases}
+            \dot x = v,\\[4pt]
+            \dot v = \dfrac{V_g g(\rho_a - \rho_{\mathrm{He}})
+                           - \mu x g - b v}
+                          {V_g \rho_{\mathrm{He}} + \mu x}.
+          \end{cases}
+          }
+          \]
+        </p>
+
+        <div class="alert alert-secondary small mt-3 mb-0">
+          En la gráfica verás cómo el globo sube rápido al principio,
+          oscila un poco y luego se estabiliza:
+          se alcanza un equilibrio entre empuje, peso de cuerda y rozamiento.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DERECHA: simulador interactivo -->
+  <div class="col-lg-7">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h5 class="card-title mb-3">Simulación globo–cuerda (parámetros editables)</h5>
+
+        <!-- Parámetros -->
+        <div class="param-grid mb-2">
+          <div>
+            <label class="form-label">V_g [m³]</label>
+            <input type="number" step="0.0001" class="form-control" id="VgInput" value="{{ V_g }}">
+          </div>
+          <div>
+            <label class="form-label">μ [kg/m]</label>
+            <input type="number" step="0.001" class="form-control" id="muInput" value="{{ mu }}">
+          </div>
+          <div>
+            <label class="form-label">b [N·s/m]</label>
+            <input type="number" step="0.001" class="form-control" id="bInput" value="{{ b }}">
+          </div>
+          <div>
+            <label class="form-label">ρ_air [kg/m³]</label>
+            <input type="number" step="0.01" class="form-control" id="rhoAInput" value="{{ rho_a }}">
+          </div>
+          <div>
+            <label class="form-label">ρ_He [kg/m³]</label>
+            <input type="number" step="0.01" class="form-control" id="rhoHeInput" value="{{ rho_He }}">
+          </div>
+          <div>
+            <label class="form-label">t_max [s]</label>
+            <input type="number" step="0.5" class="form-control" id="tmaxInput" value="10">
+          </div>
+          <div>
+            <label class="form-label">x₀ [m]</label>
+            <input type="number" step="0.01" class="form-control" id="x0Input" value="{{ x0 }}">
+          </div>
+          <div>
+            <label class="form-label">v₀ [m/s]</label>
+            <input type="number" step="0.01" class="form-control" id="v0Input" value="{{ v0 }}">
+          </div>
+        </div>
+
+        <!-- Badges info -->
+        <div class="mb-2 d-flex flex-wrap gap-2 small">
+          <span class="badge-soft">
+            Masa inicial total \(m_\text{tot}(x_0)\) =
+            <span id="mtotLabel" class="mathmono"></span> kg
+          </span>
+          <span class="badge-soft">
+            Empuje neto \(F_b - W_{\mathrm{He}}\) =
+            <span id="FnetLabel" class="mathmono"></span> N
+          </span>
+        </div>
+
+        <!-- Dibujo globo-cuerda -->
+        <div class="mb-2 d-flex justify-content-center">
+          <svg viewBox="0 0 200 220" class="balloon-svg">
+            <!-- Suelo -->
+            <rect x="0" y="200" width="200" height="20" fill="#e5e7eb"/>
+            <!-- Poste de anclaje -->
+            <rect x="95" y="180" width="10" height="20" fill="#9ca3af"/>
+
+            <!-- Cuerda -->
+            <line id="rope"
+                  x1="100" y1="180"
+                  x2="100" y2="180"
+                  stroke="#8b5cf6" stroke-width="2"/>
+
+            <!-- Globo -->
+            <g id="balloon">
+              <ellipse id="balloonBody" cx="100" cy="150" rx="16" ry="20"
+                       fill="#f97316" />
+              <line x1="100" y1="170" x2="100" y2="180"
+                    stroke="#8b5cf6" stroke-width="2"/>
+            </g>
+          </svg>
+        </div>
+
+        <!-- Slider de tiempo -->
+        <div class="mb-2">
+          <label class="form-label">Tiempo \(t\) [s]</label>
+          <input type="range" class="form-range" id="tSlider" min="0" max="10" step="0.01" value="0">
+          <div class="d-flex flex-wrap gap-2 small">
+            <span class="badge-soft">t = <span id="tVal" class="mathmono">0.00</span> s</span>
+            <span class="badge-soft">x(t) = <span id="xVal" class="mathmono">—</span> m</span>
+            <span class="badge-soft">v(t) = <span id="vVal" class="mathmono">—</span> m/s</span>
+          </div>
+        </div>
+
+        <!-- Gráfica x(t) -->
+        <div>
+          <canvas id="chartX" height="130"></canvas>
+        </div>
+        <p class="small text-muted mt-1 mb-0">
+          El punto rosa indica el estado del globo en el tiempo seleccionado.
+          Observa cómo se acerca a una altura de equilibrio donde la aceleración es casi cero.
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const VgEl = document.getElementById('VgInput');
+  const muEl = document.getElementById('muInput');
+  const bEl = document.getElementById('bInput');
+  const rhoAEl = document.getElementById('rhoAInput');
+  const rhoHeEl = document.getElementById('rhoHeInput');
+  const x0El = document.getElementById('x0Input');
+  const v0El = document.getElementById('v0Input');
+  const tmaxEl = document.getElementById('tmaxInput');
+
+  const mtotLabel = document.getElementById('mtotLabel');
+  const FnetLabel = document.getElementById('FnetLabel');
+
+  const rope = document.getElementById('rope');
+  const balloon = document.getElementById('balloon');
+
+  const tSlider = document.getElementById('tSlider');
+  const tValSpan = document.getElementById('tVal');
+  const xValSpan = document.getElementById('xVal');
+  const vValSpan = document.getElementById('vVal');
+
+  let chartX = null;
+  let tData = [];
+  let xData = [];
+  let vData = [];
+
+  function boundsWithMargin(arr, frac = 0.15) {
+    let min = Math.min(...arr);
+    let max = Math.max(...arr);
+    if (!isFinite(min) || !isFinite(max)) return {min:-0.5, max:0.5};
+    if (min === max) { min -= 0.1; max += 0.1; }
+    const span = max - min;
+    return { min: min - frac*span, max: max + frac*span };
+  }
+
+  // ===== RK4 para el sistema globo-cuerda =====
+  function rk4_step(Vg, mu, rhoA, rhoHe, b, x, v, dt){
+    const g = 9.8;
+
+    function a(x,v){
+      const mtot = Vg*rhoHe + mu*Math.max(x,0);
+      if (mtot <= 0) return 0;
+      const num = Vg*g*(rhoA - rhoHe) - mu*Math.max(x,0)*g - b*v;
+      return num / mtot;
+    }
+
+    const k1x = dt * v;
+    const k1v = dt * a(x, v);
+
+    const k2x = dt * (v + 0.5*k1v);
+    const k2v = dt * a(x + 0.5*k1x, v + 0.5*k1v);
+
+    const k3x = dt * (v + 0.5*k2v);
+    const k3v = dt * a(x + 0.5*k2x, v + 0.5*k2v);
+
+    const k4x = dt * (v + k3v);
+    const k4v = dt * a(x + k3x, v + k3v);
+
+    const xn = x + (k1x + 2*k2x + 2*k3x + k4x)/6;
+    const vn = v + (k1v + 2*k2v + 2*k3v + k4v)/6;
+
+    return [xn, vn];
+  }
+
+  // ===== Simulación =====
+  function simulate(){
+    let Vg = parseFloat(VgEl.value) || 0.002;
+    let mu = parseFloat(muEl.value) || 0.01;
+    let b = parseFloat(bEl.value) || 0.01;
+    let rhoA = parseFloat(rhoAEl.value) || 1.2;
+    let rhoHe = parseFloat(rhoHeEl.value) || 0.18;
+    let x0 = parseFloat(x0El.value) || 0.0;
+    let v0 = parseFloat(v0El.value) || 0.0;
+    let tmax = parseFloat(tmaxEl.value) || 10.0;
+
+    if (Vg <= 0) Vg = 0.002;
+    if (mu < 0) mu = 0;
+    if (b < 0) b = 0;
+    if (rhoA <= 0) rhoA = 1.2;
+    if (rhoHe <= 0) rhoHe = 0.18;
+    if (tmax <= 0) tmax = 5;
+
+    const g = 9.8;
+    const mtot0 = Vg*rhoHe + mu*Math.max(x0,0);
+    const Fnet = Vg*g*(rhoA - rhoHe);
+
+    mtotLabel.textContent = mtot0.toExponential(3);
+    FnetLabel.textContent = Fnet.toExponential(3);
+
+    const N = 1500;
+    const dt = tmax / N;
+
+    tData = [];
+    xData = [];
+    vData = [];
+
+    let x = x0;
+    let v = v0;
+
+    for (let i = 0; i <= N; i++) {
+      const t = i * dt;
+      tData.push(t);
+      xData.push(x);
+      vData.push(v);
+      [x, v] = rk4_step(Vg, mu, rhoA, rhoHe, b, x, v, dt);
+    }
+
+    tSlider.min = 0;
+    tSlider.max = tmax.toFixed(2);
+    if (parseFloat(tSlider.value) > tmax) tSlider.value = tmax;
+
+    buildOrUpdateChart();
+    updateFromSlider();
+
+    if (window.MathJax && MathJax.typesetPromise){
+      MathJax.typesetPromise().catch(()=>{});
+    }
+  }
+
+  // ===== Gráfica x(t) con marcador =====
+  function buildOrUpdateChart(){
+    const marker = new Array(tData.length).fill(null);
+    const bx = boundsWithMargin(xData);
+
+    if (!chartX){
+      chartX = new Chart(document.getElementById('chartX').getContext('2d'), {
+        type:'line',
+        data:{
+          labels: tData,
+          datasets:[
+            { label:'x(t)', data:xData, pointRadius:0, tension:0.15 },
+            { label:'t seleccionado', data:marker, pointRadius:4, showLine:false }
+          ]
+        },
+        options:{
+          animation:false,
+          responsive:true,
+          scales:{
+            x:{
+              title:{display:true,text:'t [s]'},
+              ticks:{autoSkip:true,maxTicksLimit:6,maxRotation:0,minRotation:0}
+            },
+            y:{
+              title:{display:true,text:'x(t) [m]'},
+              suggestedMin: bx.min,
+              suggestedMax: bx.max
+            }
+          },
+          plugins:{legend:{display:false}}
+        }
+      });
+    } else {
+      chartX.data.labels = tData;
+      chartX.data.datasets[0].data = xData;
+      chartX.data.datasets[1].data = marker;
+      chartX.options.scales.y.suggestedMin = bx.min;
+      chartX.options.scales.y.suggestedMax = bx.max;
+      chartX.update();
+    }
+  }
+
+  // ===== Actualizar dibujo + marcador con slider =====
+  function updateFromSlider(){
+    if (!tData.length) return;
+
+    const tSel = parseFloat(tSlider.value) || 0;
+    const tMax = tData[tData.length-1];
+    const frac = Math.max(0, Math.min(1, tSel / tMax));
+    const idx = Math.round(frac * (tData.length - 1));
+
+    const xSel = xData[idx];
+    const vSel = vData[idx];
+
+    tValSpan.textContent = tSel.toFixed(2);
+    xValSpan.textContent = xSel.toFixed(3);
+    vValSpan.textContent = vSel.toFixed(3);
+
+    // Dibujo: base de la cuerda en y=180; altura del globo = 180 - escala*x
+    const baseY = 180;
+    const minY = 40;          // límite superior del dibujo
+    const scale = 200;        // px por metro, se recorta
+    let yBalloon = baseY - xSel*scale;
+    if (yBalloon < minY) yBalloon = minY;
+    if (yBalloon > baseY-5) yBalloon = baseY-5;
+
+    rope.setAttribute('x1', 100);
+    rope.setAttribute('y1', baseY);
+    rope.setAttribute('x2', 100);
+    rope.setAttribute('y2', yBalloon);
+
+    balloon.setAttribute('transform', `translate(0, ${yBalloon-150})`);
+
+    // marcador en la gráfica
+    if (chartX){
+      const m = chartX.data.datasets[1].data;
+      for (let i=0;i<m.length;i++) m[i] = null;
+      m[idx] = xSel;
+      chartX.update('none');
+    }
+  }
+
+  // Eventos
+  [VgEl,muEl,bEl,rhoAEl,rhoHeEl,x0El,v0El,tmaxEl].forEach(el => {
+    el.addEventListener('input', simulate);
+    el.addEventListener('change', simulate);
+  });
+  tSlider.addEventListener('input', updateFromSlider);
+
+  // Init
+  simulate();
+});
+</script>
+{% endblock %}

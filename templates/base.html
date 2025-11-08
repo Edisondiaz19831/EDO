@@ -65,6 +65,12 @@
       margin-top: -6px;
       margin-left: -1px;
       border-radius: 0 6px 6px 6px;
+      display: none;
+    }
+
+    .dropdown-submenu:hover > .dropdown-menu,
+    .dropdown-submenu.show > .dropdown-menu {
+      display: block;
     }
 
     .dropdown-submenu .dropdown-toggle::after {
@@ -79,6 +85,11 @@
         margin: 0.25rem 0 0.25rem 1rem;
         border-left: 2px solid #dee2e6;
         border-radius: 0;
+        display: none;
+      }
+      
+      .dropdown-submenu.show > .dropdown-menu {
+        display: block;
       }
       
       .dropdown-submenu .dropdown-toggle::after {
@@ -186,122 +197,194 @@
     <div class="collapse navbar-collapse" id="navbarNav">
       <ul class="navbar-nav ms-auto">
 
-        <li class="nav-item">
-          <a class="nav-link {% if request.endpoint == 'index' %}active{% endif %}" href="{{ url_for('index') }}">
-            Ecuación de Bernoulli/Torricelli
-          </a>
-        </li>
-
-        <li class="nav-item">
-          <a class="nav-link {% if request.endpoint == 'continuidad' %}active{% endif %}" href="{{ url_for('continuidad') }}">
-            Continuidad
-          </a>
-        </li>
-
-        <!-- DESPLEGABLE DE INTEGRACIÓN -->
-        <li class="nav-item dropdown">
-          <a class="nav-link dropdown-toggle {% if request.endpoint in ['integracion', 'modelo_lineal'] %}active{% endif %}" 
-             href="#" id="integracionDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-            Integración
-          </a>
-          <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="integracionDropdown">
-            <li>
-              <a class="dropdown-item {% if request.endpoint == 'integracion' %}active{% endif %}" 
-                 href="{{ url_for('integracion') }}">
-                Caso Cilindro
-              </a>
-            </li>
-            <li>
-              <a class="dropdown-item {% if request.endpoint == 'modelo_lineal' %}active{% endif %}" 
-                 href="{{ url_for('modelo_lineal') }}">
-                Caso Cono
-              </a>
-            </li>
-          </ul>
-        </li>
-
-        <!-- DESPLEGABLE DE APLICACIONES (multi-nivel) -->
+        <!-- DESPLEGABLE DE TEMA 1 (agrupando todo el contenido actual) -->
         <li class="nav-item dropdown">
           <a class="nav-link dropdown-toggle {% if request.endpoint in [
+              'index', 'continuidad', 'integracion', 'modelo_lineal',
               'metodo_analiticoc','metodo_numericoc','barrido_area',
               'cono_perfecto_analitico','cono_perfecto_numerico',
               'cono_truncado_analitico','cono_truncado_numerico','barrido_areac'
             ] %}active{% endif %}"
-             href="#" id="aplicacionesDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-            Aplicaciones
+             href="#" id="tema1Dropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+            Ecuaciones Diferenciales de Primer Orden
           </a>
 
-          <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="aplicacionesDropdown">
+          <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="tema1Dropdown">
 
-            <!-- Submenú: Cilindro -->
+            <!-- Elementos principales -->
+            <li>
+              <a class="dropdown-item {% if request.endpoint == 'index' %}active{% endif %}" 
+                 href="{{ url_for('index') }}">
+                Ecuación de Bernoulli/Torricelli
+              </a>
+            </li>
+
+            <li>
+              <a class="dropdown-item {% if request.endpoint == 'continuidad' %}active{% endif %}" 
+                 href="{{ url_for('continuidad') }}">
+                Continuidad
+              </a>
+            </li>
+
+            <!-- Submenú: Integración -->
             <li class="dropdown-submenu">
-              <a class="dropdown-item dropdown-toggle" href="#">Cilindro</a>
+              <a class="dropdown-item dropdown-toggle" href="#" role="button">Integración</a>
               <ul class="dropdown-menu">
                 <li>
-                  <a class="dropdown-item {% if request.endpoint == 'metodo_analiticoc' %}active{% endif %}"
-                     href="{{ url_for('metodo_analiticoc') }}">
-                    Método analítico
+                  <a class="dropdown-item {% if request.endpoint == 'integracion' %}active{% endif %}" 
+                     href="{{ url_for('integracion') }}">
+                    Caso Cilindro
                   </a>
                 </li>
                 <li>
-                  <a class="dropdown-item {% if request.endpoint == 'metodo_numericoc' %}active{% endif %}"
-                     href="{{ url_for('metodo_numericoc') }}">
-                    Método numérico
-                  </a>
-                </li>
-                <li>
-                  <a class="dropdown-item {% if request.endpoint == 'barrido_area' %}active{% endif %}"
-                     href="{{ url_for('barrido_area') }}">
-                    Áreas de salida
+                  <a class="dropdown-item {% if request.endpoint == 'modelo_lineal' %}active{% endif %}" 
+                     href="{{ url_for('modelo_lineal') }}">
+                    Caso Cono
                   </a>
                 </li>
               </ul>
             </li>
 
-            <!-- Submenú: Cono perfecto -->
+            <!-- Submenú: Aplicaciones (multi-nivel) -->
             <li class="dropdown-submenu">
-              <a class="dropdown-item dropdown-toggle" href="#">Cono perfecto</a>
+              <a class="dropdown-item dropdown-toggle" href="#" role="button">Aplicaciones</a>
               <ul class="dropdown-menu">
-                <li>
-                  <a class="dropdown-item {% if request.endpoint == 'cono_perfecto_analitico' %}active{% endif %}"
-                     href="{{ url_for('cono_perfecto_analitico') }}">
-                    Método analítico
-                  </a>
+
+                <!-- Submenú: Cilindro -->
+                <li class="dropdown-submenu">
+                  <a class="dropdown-item dropdown-toggle" href="#" role="button">Cilindro</a>
+                  <ul class="dropdown-menu">
+                    <li>
+                      <a class="dropdown-item {% if request.endpoint == 'metodo_analiticoc' %}active{% endif %}"
+                         href="{{ url_for('metodo_analiticoc') }}">
+                        Método analítico
+                      </a>
+                    </li>
+                    <li>
+                      <a class="dropdown-item {% if request.endpoint == 'metodo_numericoc' %}active{% endif %}"
+                         href="{{ url_for('metodo_numericoc') }}">
+                        Método numérico
+                      </a>
+                    </li>
+                    <li>
+                      <a class="dropdown-item {% if request.endpoint == 'barrido_area' %}active{% endif %}"
+                         href="{{ url_for('barrido_area') }}">
+                        Áreas de salida
+                      </a>
+                    </li>
+                  </ul>
                 </li>
-                <li>
-                  <a class="dropdown-item {% if request.endpoint == 'cono_perfecto_numerico' %}active{% endif %}"
-                     href="{{ url_for('cono_perfecto_numerico') }}">
-                    Método numérico
-                  </a>
+
+                <!-- Submenú: Cono perfecto -->
+                <li class="dropdown-submenu">
+                  <a class="dropdown-item dropdown-toggle" href="#" role="button">Cono perfecto</a>
+                  <ul class="dropdown-menu">
+                    <li>
+                      <a class="dropdown-item {% if request.endpoint == 'cono_perfecto_analitico' %}active{% endif %}"
+                         href="{{ url_for('cono_perfecto_analitico') }}">
+                        Método analítico
+                      </a>
+                    </li>
+                    <li>
+                      <a class="dropdown-item {% if request.endpoint == 'cono_perfecto_numerico' %}active{% endif %}"
+                         href="{{ url_for('cono_perfecto_numerico') }}">
+                        Método numérico
+                      </a>
+                    </li>
+                  </ul>
                 </li>
+
+                <!-- Submenú: Cono truncado -->
+                <li class="dropdown-submenu">
+                  <a class="dropdown-item dropdown-toggle" href="#" role="button">Cono truncado</a>
+                  <ul class="dropdown-menu">
+                    <li>
+                      <a class="dropdown-item {% if request.endpoint == 'cono_truncado_analitico' %}active{% endif %}"
+                         href="{{ url_for('cono_truncado_analitico') }}">
+                        Método analítico
+                      </a>
+                    </li>
+                    <li>
+                      <a class="dropdown-item {% if request.endpoint == 'cono_truncado_numerico' %}active{% endif %}"
+                         href="{{ url_for('cono_truncado_numerico') }}">
+                        Método numérico
+                      </a>
+                    </li>
+                    <li>
+                      <a class="dropdown-item {% if request.endpoint == 'barrido_areac' %}active{% endif %}"
+                         href="{{ url_for('barrido_areac') }}">
+                        Áreas de salida
+                      </a>
+                    </li>
+                  </ul>
+                </li>
+
               </ul>
             </li>
 
-            <!-- Submenú: Cono truncado -->
-            <li class="dropdown-submenu">
-              <a class="dropdown-item dropdown-toggle" href="#">Cono truncado</a>
-              <ul class="dropdown-menu">
-                <li>
-                  <a class="dropdown-item {% if request.endpoint == 'cono_truncado_analitico' %}active{% endif %}"
-                     href="{{ url_for('cono_truncado_analitico') }}">
-                    Método analítico
-                  </a>
-                </li>
-                <li>
-                  <a class="dropdown-item {% if request.endpoint == 'cono_truncado_numerico' %}active{% endif %}"
-                     href="{{ url_for('cono_truncado_numerico') }}">
-                    Método numérico
-                  </a>
-                </li>
-                <li>
-                  <a class="dropdown-item {% if request.endpoint == 'barrido_areac' %}active{% endif %}"
-                     href="{{ url_for('barrido_areac') }}">
-                    Áreas de salida
-                  </a>
-                </li>
-              </ul>
+          </ul>
+        </li>
+
+        <!-- DESPLEGABLE DE TEMA 2 -->
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle" href="#" id="tema2Dropdown" role="button" 
+             data-bs-toggle="dropdown" aria-expanded="false">
+            Ecuaciones Diferenciales de Segundo Orden
+          </a>
+
+          <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="tema2Dropdown">
+
+            <!-- Introducción -->
+            <li>
+              <h6 class="dropdown-header text-muted">Modelos Físicos Introductorios</h6>
             </li>
 
+            <!-- Cuerda sobre la mesa -->
+            <li>
+              <a class="dropdown-item" href="{{ url_for('cuerda_masa_variable') }}">
+                🧶 Cuerda sobre la mesa — masa variable
+              </a>
+                  <a class="dropdown-item" href="{{ url_for('cuerda_masa_variable_codigo') }}">
+                🧶 Cuerda sobre la mesa — Codigo python
+              </a>
+
+                </a>
+                  <a class="dropdown-item" href="{{ url_for('cuerda_enrollada') }}">
+                🌀 Cuerda enrollada
+              </a>
+
+
+            </li>
+            <li><a class="dropdown-item" href="{{ url_for('oscilador_amortiguado') }}">⚖️ Oscilador amortiguado</a></li>
+
+            <li><a class="dropdown-item" href="{{ url_for('oscilador_forzado') }}">
+  Oscilador amortiguado y forzado (2.2)
+</a></li>
+
+
+            <li><hr class="dropdown-divider"></li>
+
+            <!-- Futuras secciones -->
+            <li>
+              <h6 class="dropdown-header text-muted">Próximos modelos</h6>
+            </li>
+
+        
+
+            <li>
+  <a class="dropdown-item" href="{{ url_for('globo_cuerda') }}">
+    Sistema globo–cuerda
+  </a>
+</li>
+<li>
+  <a class="dropdown-item" href="{{ url_for('tanque_oscilador') }}">
+    Tanque sobre resorte (masa variable)
+  </a>
+</li>
+
+
+            <li><hr class="dropdown-divider"></li>
+            <li><a class="dropdown-item text-muted small" href="#">Más temas pronto...</a></li>
           </ul>
         </li>
 
@@ -347,29 +430,45 @@ document.addEventListener('DOMContentLoaded', function() {
     dropdownElements.forEach(function(element) {
         var trigger = element.querySelector('.dropdown-toggle');
         
+        // Para desktop - hover
+        element.addEventListener('mouseenter', function() {
+            if (window.innerWidth > 991.98) {
+                this.classList.add('show');
+            }
+        });
+        
+        element.addEventListener('mouseleave', function() {
+            if (window.innerWidth > 991.98) {
+                this.classList.remove('show');
+            }
+        });
+        
+        // Para mobile - click
         trigger.addEventListener('click', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            
-            var submenu = this.nextElementSibling;
-            var isOpen = submenu.classList.contains('show');
-            
-            // Cerrar todos los submenús primero
-            document.querySelectorAll('.dropdown-submenu .dropdown-menu').forEach(function(menu) {
-                menu.classList.remove('show');
-            });
-            
-            // Abrir el submenú actual si no estaba abierto
-            if (!isOpen) {
-                submenu.classList.add('show');
+            if (window.innerWidth <= 991.98) {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                var parent = this.closest('.dropdown-submenu');
+                var isOpen = parent.classList.contains('show');
+                
+                // Cerrar todos los submenús primero
+                document.querySelectorAll('.dropdown-submenu').forEach(function(menu) {
+                    menu.classList.remove('show');
+                });
+                
+                // Abrir el submenú actual si no estaba abierto
+                if (!isOpen) {
+                    parent.classList.add('show');
+                }
             }
         });
     });
 
-    // Cerrar submenús cuando se hace clic fuera
+    // Cerrar todos los submenús cuando se hace clic fuera
     document.addEventListener('click', function(e) {
-        if (!e.target.matches('.dropdown-submenu, .dropdown-submenu *')) {
-            document.querySelectorAll('.dropdown-submenu .dropdown-menu').forEach(function(menu) {
+        if (!e.target.closest('.dropdown-submenu')) {
+            document.querySelectorAll('.dropdown-submenu').forEach(function(menu) {
                 menu.classList.remove('show');
             });
         }
@@ -378,7 +477,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Cerrar submenús cuando se cambia de dropdown principal
     document.querySelectorAll('.nav-item.dropdown').forEach(function(dropdown) {
         dropdown.addEventListener('hidden.bs.dropdown', function() {
-            this.querySelectorAll('.dropdown-submenu .dropdown-menu').forEach(function(menu) {
+            this.querySelectorAll('.dropdown-submenu').forEach(function(menu) {
                 menu.classList.remove('show');
             });
         });

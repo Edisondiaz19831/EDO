@@ -1,0 +1,526 @@
+{% extends "base.html" %}
+{% block title %}Tanque sobre resorte — masa variable{% endblock %}
+
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<style>
+  .mathmono {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  }
+  .badge-soft {
+    background:#eef2ff;
+    color:#1e2a78;
+    border:1px solid #c7d2fe;
+    border-radius:8px;
+    padding:2px 8px;
+    font-size:.8rem;
+  }
+  .param-grid{
+    display:grid;
+    grid-template-columns:repeat(3,minmax(0,1fr));
+    gap:10px;
+  }
+  @media (max-width: 768px) {
+    .param-grid{ grid-template-columns:repeat(2,minmax(0,1fr)); }
+  }
+  .tank-spring-svg{
+    width:100%;
+    max-width:280px;
+    height:auto;
+  }
+  .spring-path {
+    fill: none;
+    stroke: #6b7280;
+    stroke-width: 2;
+  }
+  .damper-body {
+    fill: #4b5563;
+  }
+  .damper-piston {
+    fill: #9ca3af;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+
+  <!-- IZQUIERDA: explicación -->
+  <div class="col-lg-5">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h5 class="card-title mb-3">Tanque + resorte amortiguado con masa variable</h5>
+
+        <p class="small text-muted">
+          Un tanque cilíndrico lleno de agua está sobre un resorte con amortiguador.
+          El agua sale por un orificio (Torricelli), la masa del sistema cambia y eso modifica
+          la frecuencia del oscilador. Usamos el mismo enfoque del oscilador amortiguado visto en clase.
+        </p>
+
+        <h6 class="mb-1">1. Masa total</h6>
+        <p class="small mb-1">
+          \[
+            m(t) = M + \rho A h(t).
+          \]
+        </p>
+
+        <h6 class="mb-1">2. Vaciado (Torricelli)</h6>
+        <p class="small mb-1">
+          \[
+            \dot h = -\frac{a}{A}\sqrt{2gh},\quad h\ge 0.
+          \]
+        </p>
+
+        <h6 class="mb-1">3. Coordenada del oscilador</h6>
+        <p class="small mb-1">
+          Definimos \(x(t)\) como desplazamiento desde la posición de equilibrio instantánea.
+          Entonces, siguiendo el esquema del profe:
+          \[
+            m(t)\ddot x + c\dot x + kx = 0.
+          \]
+        </p>
+
+        <h6 class="mb-1">4. Sistema acoplado</h6>
+        <p class="small mb-2">
+          \[
+          \begin{cases}
+          \dot x = v,\\[4pt]
+          \dot v = -\dfrac{c}{m(t)}v - \dfrac{k}{m(t)}x,\\[6pt]
+          \dot h = -\dfrac{a}{A}\sqrt{2gh},\\[4pt]
+          m(t) = M + \rho A h(t).
+          \end{cases}
+          \]
+        </p>
+
+        <div class="alert alert-secondary small mb-0">
+          Al inicio \(m\) es grande ⇒ oscilaciones lentas.
+          A medida que se vacía el tanque, \(m(t)\) baja,
+          \(\omega(t)=\sqrt{k/m(t)}\) sube y el sistema oscila más rápido.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DERECHA: simulador -->
+  <div class="col-lg-7">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h5 class="card-title mb-3">Simulación interactiva tanque–oscilador</h5>
+
+        <!-- Parámetros -->
+        <div class="param-grid mb-2">
+          <div>
+            <label class="form-label">A [m²]</label>
+            <input type="number" step="0.0001" class="form-control" id="AInput" value="{{ A }}">
+          </div>
+          <div>
+            <label class="form-label">a [m²]</label>
+            <input type="number" step="0.000001" class="form-control" id="aInput" value="{{ a }}">
+          </div>
+          <div>
+            <label class="form-label">ρ [kg/m³]</label>
+            <input type="number" step="1" class="form-control" id="rhoInput" value="{{ rho }}">
+          </div>
+          <div>
+            <label class="form-label">M (tanque) [kg]</label>
+            <input type="number" step="0.1" class="form-control" id="MInput" value="{{ M }}">
+          </div>
+          <div>
+            <label class="form-label">k [N/m]</label>
+            <input type="number" step="1" class="form-control" id="kInput" value="{{ k }}">
+          </div>
+          <div>
+            <label class="form-label">c [N·s/m]</label>
+            <input type="number" step="0.1" class="form-control" id="cInput" value="{{ c }}">
+          </div>
+          <div>
+            <label class="form-label">h₀ [m]</label>
+            <input type="number" step="0.01" class="form-control" id="h0Input" value="{{ h0 }}">
+          </div>
+          <div>
+            <label class="form-label">x₀ [m]</label>
+            <input type="number" step="0.01" class="form-control" id="x0Input" value="{{ x0 }}">
+          </div>
+          <div>
+            <label class="form-label">v₀ [m/s]</label>
+            <input type="number" step="0.01" class="form-control" id="v0Input" value="{{ v0 }}">
+          </div>
+          <div>
+            <label class="form-label">t_max [s]</label>
+            <input type="number" step="0.5" class="form-control" id="tmaxInput" value="20">
+          </div>
+        </div>
+
+        <!-- Info rápida -->
+        <div class="mb-2 d-flex flex-wrap gap-2 small">
+          <span class="badge-soft">
+            m(0) = <span id="m0Label" class="mathmono"></span> kg
+          </span>
+          <span class="badge-soft">
+            ω₀(0) = <span id="omega0Label" class="mathmono"></span> rad/s
+          </span>
+        </div>
+
+        <!-- Dibujo -->
+        <div class="d-flex justify-content-center mb-3">
+          <svg viewBox="0 0 240 280" class="tank-spring-svg">
+            <!-- Suelo -->
+            <rect x="0" y="250" width="240" height="30" fill="#a8a29e"/>
+            <!-- Base fija -->
+            <rect x="80" y="240" width="80" height="10" fill="#78716c"/>
+
+            <!-- Resorte -->
+            <path id="springPath" class="spring-path" d="M110,240 L110,230"/>
+
+            <!-- Amortiguador -->
+            <g id="damperGroup">
+              <rect id="damperCylinder" x="130" y="230" width="20" height="20" class="damper-body"/>
+              <rect id="damperPiston" x="132" y="225" width="16" height="10" class="damper-piston"/>
+            </g>
+
+            <!-- Plataforma móvil -->
+            <rect id="platform" x="70" y="220" width="100" height="10" fill="#57534e"/>
+
+            <!-- Tanque + agua -->
+            <g id="tankGroup" transform="translate(80,120)">
+              <rect x="0" y="0" width="80" height="100"
+                    fill="#f9fafb" stroke="#111827" stroke-width="2"/>
+              <rect id="waterRect" x="2" y="80" width="76" height="20"
+                    fill="#60a5fa" opacity="0.75"/>
+              <rect id="waterTop" x="2" y="80" width="76" height="2"
+                    fill="#bfdbfe"/>
+              <rect x="0" y="100" width="80" height="5" fill="#374151"/>
+            </g>
+          </svg>
+        </div>
+
+        <!-- Slider -->
+        <div class="mb-2">
+          <label class="form-label">Tiempo \(t\) [s]</label>
+          <input type="range" class="form-range" id="tSlider" min="0" max="20" step="0.01" value="0">
+          <div class="d-flex flex-wrap gap-2 small">
+            <span class="badge-soft">t = <span id="tVal" class="mathmono">0.00</span> s</span>
+            <span class="badge-soft">h(t) = <span id="hVal" class="mathmono">—</span> m</span>
+            <span class="badge-soft">x(t) = <span id="xVal" class="mathmono">—</span> m</span>
+            <span class="badge-soft">v(t) = <span id="vVal" class="mathmono">—</span> m/s</span>
+          </div>
+        </div>
+
+        <!-- Gráficas -->
+        <div class="mb-3">
+          <canvas id="chartH" height="110"></canvas>
+        </div>
+        <div>
+          <canvas id="chartX" height="110"></canvas>
+        </div>
+
+        <p class="small text-muted mt-2 mb-0">
+          El deslizador mueve el tiempo en ambas gráficas y en el dibujo:
+          ves vaciarse el tanque y cómo cambian las oscilaciones.
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===== Geometría SVG =====
+const TANK_INITIAL_Y = 120;    // translateY inicial grupo tanque
+const PLATFORM_Y0    = 220;    // y inicial plataforma
+const SPRING_BOTTOM_Y = 240;   // anclaje inferior resorte
+
+// Límites de desplazamiento visual (en píxeles)
+const MAX_COMPRESS = 25;       // máximo que puede bajar (hacia el resorte)
+const MAX_EXTEND   = -40;      // máximo que puede subir
+
+document.addEventListener('DOMContentLoaded', () => {
+  const AEl = document.getElementById('AInput');
+  const aEl = document.getElementById('aInput');
+  const rhoEl = document.getElementById('rhoInput');
+  const MEl = document.getElementById('MInput');
+  const kEl = document.getElementById('kInput');
+  const cEl = document.getElementById('cInput');
+  const h0El = document.getElementById('h0Input');
+  const x0El = document.getElementById('x0Input');
+  const v0El = document.getElementById('v0Input');
+  const tmaxEl = document.getElementById('tmaxInput');
+
+  const m0Label = document.getElementById('m0Label');
+  const omega0Label = document.getElementById('omega0Label');
+
+  const waterRect = document.getElementById('waterRect');
+  const waterTop = document.getElementById('waterTop');
+  const tankGroup = document.getElementById('tankGroup');
+  const springPath = document.getElementById('springPath');
+  const platform = document.getElementById('platform');
+  const damperPiston = document.getElementById('damperPiston');
+  const damperCylinder = document.getElementById('damperCylinder');
+
+  const tSlider = document.getElementById('tSlider');
+  const tValSpan = document.getElementById('tVal');
+  const hValSpan = document.getElementById('hVal');
+  const xValSpan = document.getElementById('xVal');
+  const vValSpan = document.getElementById('vVal');
+
+  let chartH = null;
+  let chartX = null;
+  let tData = [], hData = [], xData = [], vData = [];
+
+  const g = 9.8;
+
+  function bounds(arr, frac=0.15){
+    let min = Math.min(...arr), max = Math.max(...arr);
+    if (!isFinite(min) || !isFinite(max)){ return {min:-0.5, max:0.5}; }
+    if (min === max){ min -= 0.1; max += 0.1; }
+    const span = max-min;
+    return {min: min-frac*span, max:max+frac*span};
+  }
+
+  // ===== derivadas del sistema [x, v, h] =====
+  function deriv(state, A, a, rho, M, k, c){
+    const x = state[0], v = state[1], h = Math.max(state[2],0);
+    const m = M + rho*A*h;
+    const dhdt = (h>0 && A>0 && a>=0) ? -(a/A)*Math.sqrt(2*g*h) : 0;
+    const dvdt = (m>0) ? ( - (c/m)*v - (k/m)*x ) : 0;
+    return [v, dvdt, dhdt];
+  }
+
+  // RK4 un paso
+  function rk4_step(state, dt, A, a, rho, M, k, c){
+    const k1 = deriv(state, A,a,rho,M,k,c);
+    const k2 = deriv(state.map((s,i)=>s+0.5*dt*k1[i]), A,a,rho,M,k,c);
+    const k3 = deriv(state.map((s,i)=>s+0.5*dt*k2[i]), A,a,rho,M,k,c);
+    const k4 = deriv(state.map((s,i)=>s+dt*k3[i]), A,a,rho,M,k,c);
+    return state.map((s,i)=> s + dt*(k1[i]+2*k2[i]+2*k3[i]+k4[i])/6 );
+  }
+
+  // ===== simulación =====
+  function simulate(){
+    let A = parseFloat(AEl.value) || {{ A }};
+    let a = parseFloat(aEl.value) || {{ a }};
+    let rho = parseFloat(rhoEl.value) || {{ rho }};
+    let M = parseFloat(MEl.value) || {{ M }};
+    let k = parseFloat(kEl.value) || {{ k }};
+    let c = parseFloat(cEl.value) || {{ c }};
+    let h0 = parseFloat(h0El.value) || {{ h0 }};
+    let x0 = parseFloat(x0El.value) || {{ x0 }};
+    let v0 = parseFloat(v0El.value) || {{ v0 }};
+    let tmax = parseFloat(tmaxEl.value) || 20;
+
+    if (A<=0) A=0.2;
+    if (a<0) a=0;
+    if (rho<=0) rho=1000;
+    if (M<=0) M=5;
+    if (k<=0) k=50;
+    if (c<0) c=0.5;
+    if (tmax<=0) tmax=10;
+
+    // Si x0≈0, ponemos un pequeño desplazamiento para que se vea la oscilación
+    if (Math.abs(x0) < 1e-6) {
+      x0 = 0.05;
+      x0El.value = x0.toFixed(2);
+    }
+
+    const m0 = M + rho*A*Math.max(h0,0);
+    const omega0 = Math.sqrt(k/m0);
+
+    m0Label.textContent = m0.toFixed(3);
+    omega0Label.textContent = omega0.toFixed(3);
+
+    const N = 1500;
+    const dt = tmax / N;
+
+    tData = [];
+    hData = [];
+    xData = [];
+    vData = [];
+
+    let state = [x0, v0, h0];
+
+    for (let i=0; i<=N; i++){
+      const t = i*dt;
+      tData.push(t);
+      xData.push(state[0]);
+      vData.push(state[1]);
+      hData.push(Math.max(state[2],0));
+      state = rk4_step(state, dt, A,a,rho,M,k,c);
+      if (state[2] < 0) state[2] = 0;
+    }
+
+    tSlider.min = 0;
+    tSlider.max = tmax.toFixed(2);
+    if (parseFloat(tSlider.value) > tmax) tSlider.value = tmax;
+
+    buildCharts();
+    updateFromSlider();
+
+    if (window.MathJax && MathJax.typesetPromise){
+      MathJax.typesetPromise().catch(()=>{});
+    }
+  }
+
+  // ===== gráficas =====
+  function buildCharts(){
+    const markerH = new Array(tData.length).fill(null);
+    const markerX = new Array(tData.length).fill(null);
+
+    const bH = bounds(hData);
+    const bX = bounds(xData);
+
+    if (!chartH){
+      chartH = new Chart(document.getElementById('chartH').getContext('2d'), {
+        type:'line',
+        data:{
+          labels:tData,
+          datasets:[
+            {label:'h(t)', data:hData, pointRadius:0, tension:0.15},
+            {label:'t', data:markerH, pointRadius:4, showLine:false}
+          ]
+        },
+        options:{
+          animation:false,
+          responsive:true,
+          scales:{
+            x:{title:{display:true,text:'t [s]'},ticks:{autoSkip:true,maxTicksLimit:6}},
+            y:{title:{display:true,text:'h(t) [m]'},
+               suggestedMin:bH.min, suggestedMax:bH.max}
+          },
+          plugins:{legend:{display:false}}
+        }
+      });
+    } else {
+      chartH.data.labels = tData;
+      chartH.data.datasets[0].data = hData;
+      chartH.data.datasets[1].data = markerH;
+      chartH.options.scales.y.suggestedMin = bH.min;
+      chartH.options.scales.y.suggestedMax = bH.max;
+      chartH.update();
+    }
+
+    if (!chartX){
+      chartX = new Chart(document.getElementById('chartX').getContext('2d'), {
+        type:'line',
+        data:{
+          labels:tData,
+          datasets:[
+            {label:'x(t)', data:xData, pointRadius:0, tension:0.15},
+            {label:'t', data:markerX, pointRadius:4, showLine:false}
+          ]
+        },
+        options:{
+          animation:false,
+          responsive:true,
+          scales:{
+            x:{title:{display:true,text:'t [s]'},ticks:{autoSkip:true,maxTicksLimit:6}},
+            y:{title:{display:true,text:'x(t) [m]'},
+               suggestedMin:bX.min, suggestedMax:bX.max}
+          },
+          plugins:{legend:{display:false}}
+        }
+      });
+    } else {
+      chartX.data.labels = tData;
+      chartX.data.datasets[0].data = xData;
+      chartX.data.datasets[1].data = markerX;
+      chartX.options.scales.y.suggestedMin = bX.min;
+      chartX.options.scales.y.suggestedMax = bX.max;
+      chartX.update();
+    }
+  }
+
+  // ===== actualizar dibujo + marcadores =====
+  function updateFromSlider(){
+    if (!tData.length) return;
+
+    const tSel = parseFloat(tSlider.value) || 0;
+    const tMax = tData[tData.length-1];
+    const frac = Math.max(0, Math.min(1, tSel/tMax));
+    const idx = Math.round(frac*(tData.length-1));
+
+    const hSel = hData[idx];
+    const xSel = xData[idx];
+    const vSel = vData[idx];
+
+    tValSpan.textContent = tSel.toFixed(2);
+    hValSpan.textContent = hSel.toFixed(3);
+    xValSpan.textContent = xSel.toFixed(3);
+    vValSpan.textContent = vSel.toFixed(3);
+
+    // Agua
+    const h0 = hData[0] || 1e-6;
+    const hRel = Math.max(0, Math.min(1, hSel / h0));
+    const waterHeight = hRel * 20;
+    const waterY = 100 - waterHeight;
+    waterRect.setAttribute('y', waterY);
+    waterRect.setAttribute('height', waterHeight);
+    waterTop.setAttribute('y', waterY);
+
+    // Movimiento vertical del tanque/platforma
+    const scale = 80; // m -> px
+    let disp = xSel * scale;
+
+    if (disp > MAX_COMPRESS) disp = MAX_COMPRESS;
+    if (disp < MAX_EXTEND)   disp = MAX_EXTEND;
+
+    const platformY = PLATFORM_Y0 + disp;
+    const tankY = TANK_INITIAL_Y + disp;
+
+    platform.setAttribute('y', platformY);
+    tankGroup.setAttribute('transform', `translate(80, ${tankY})`);
+
+    updateSpring(platformY);
+    updateDamper(platformY);
+
+    if (chartH && chartX){
+      const mH = chartH.data.datasets[1].data;
+      const mX = chartX.data.datasets[1].data;
+      for (let i=0;i<mH.length;i++){ mH[i]=null; mX[i]=null; }
+      mH[idx] = hSel;
+      mX[idx] = xSel;
+      chartH.update('none');
+      chartX.update('none');
+    }
+  }
+
+  function updateSpring(topY) {
+    const bottomY = SPRING_BOTTOM_Y;
+    let height = bottomY - topY;
+    if (height < 8) height = 8;
+
+    const segments = 8;
+    const amplitude = 8;
+    let path = `M110,${bottomY} `;
+
+    for (let i = 1; i <= segments; i++) {
+      const y = bottomY - (height * i / segments);
+      const x = 110 + (i % 2 === 0 ? amplitude : -amplitude);
+      path += `L${x},${y} `;
+    }
+    path += `L110,${topY}`;
+    springPath.setAttribute('d', path);
+  }
+
+  function updateDamper(platformY) {
+    const baseY = 230; // parte fija
+    damperCylinder.setAttribute('y', baseY);
+    damperCylinder.setAttribute('height', 20);
+
+    const pistonBottom = baseY;
+    const pistonTop = Math.min(platformY - 10, pistonBottom);
+    const h = Math.max(5, pistonBottom - pistonTop);
+    damperPiston.setAttribute('y', pistonTop);
+    damperPiston.setAttribute('height', h);
+  }
+
+  [AEl,aEl,rhoEl,MEl,kEl,cEl,h0El,x0El,v0El,tmaxEl].forEach(el => {
+    el.addEventListener('input', simulate);
+    el.addEventListener('change', simulate);
+  });
+
+  tSlider.addEventListener('input', updateFromSlider);
+
+  simulate();
+});
+</script>
+{% endblock %}

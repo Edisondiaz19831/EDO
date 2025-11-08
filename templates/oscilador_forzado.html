@@ -1,0 +1,445 @@
+{% extends "base.html" %}
+{% block title %}Oscilador amortiguado y forzado — Interactivo{% endblock %}
+
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<style>
+  .mathmono {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  }
+  .badge-soft {
+    background:#eef2ff;
+    color:#1e2a78;
+    border:1px solid #c7d2fe;
+    border-radius:8px;
+    padding:2px 8px;
+    font-size:.8rem;
+  }
+  .param-grid{
+    display:grid;
+    grid-template-columns:repeat(3,minmax(0,1fr));
+    gap:10px;
+  }
+  @media (max-width: 768px) {
+    .param-grid{ grid-template-columns:repeat(2,minmax(0,1fr)); }
+  }
+  .spring-svg{
+    width:100%;
+    max-width:280px;
+    height:auto;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+  <!-- IZQUIERDA: explicación -->
+  <div class="col-lg-5">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h5 class="card-title mb-3">2.2 Oscilador amortiguado y forzado</h5>
+
+        <p class="small text-muted">
+          Ahora al oscilador amortiguado le agregamos una fuerza externa periódica:
+        </p>
+
+        <p class="small">
+          \[
+            \frac{d^2x}{dt^2} + \Gamma \frac{dx}{dt} + \omega_0^2 x
+            = \frac{F_0}{m}\cos(\omega_f t),
+          \]
+          donde
+          \(\omega_0^2 = \frac{k}{m}\), \(\Gamma = \frac{b}{m}\).
+        </p>
+
+        <h6 class="mb-1">Como sistema (igual que en el notebook):</h6>
+        <p class="small">
+          \[
+          \begin{cases}
+            \dfrac{dx}{dt} = v,\\[4pt]
+            \dfrac{dv}{dt} = \dfrac{F_0}{m}\cos(\omega_f t)
+                              - \Gamma v
+                              - \omega_0^2 x.
+          \end{cases}
+          \]
+        </p>
+
+        <pre class="small bg-light p-2 rounded mb-3">
+def modelo_4(z, t):
+    x = z[0]
+    v = z[1]
+    dzdt = [0.0, 0.0]
+    dzdt[0] = v
+    dzdt[1] = (F_0/m)*np.cos(omega_f*t) - Gamma*v - omega_0**2 * x
+    return dzdt
+        </pre>
+
+        <p class="small text-muted mb-2">
+          Con esta página puedes ver cómo:
+          primero domina la respuesta transitoria,
+          y luego queda una oscilación casi estacionaria
+          controlada por \(\omega_f\) y el amortiguamiento.
+        </p>
+
+        <div class="alert alert-secondary small mb-0">
+          Valores iniciales cargados:
+          \(k=50\), \(m=0.5\), \(b=0.5\),
+          \(F_0=70\), \(\omega_f=30\),
+          \(x_0=10\), \(v_0=0\).
+          Puedes modificarlos para explorar resonancia, más amortiguamiento, etc.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DERECHA: simulador -->
+  <div class="col-lg-7">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h5 class="card-title mb-3">Simulación interactiva forzada</h5>
+
+        <!-- Parámetros -->
+        <div class="param-grid mb-2">
+          <div>
+            <label class="form-label">k [N/m]</label>
+            <input type="number" step="1" class="form-control" id="kInput" value="{{ k }}">
+          </div>
+          <div>
+            <label class="form-label">m [kg]</label>
+            <input type="number" step="0.1" class="form-control" id="mInput" value="{{ m }}">
+          </div>
+          <div>
+            <label class="form-label">b [N·s/m]</label>
+            <input type="number" step="0.1" class="form-control" id="bInput" value="{{ b }}">
+          </div>
+          <div>
+            <label class="form-label">F₀ [N]</label>
+            <input type="number" step="1" class="form-control" id="F0Input" value="{{ F0 }}">
+          </div>
+          <div>
+            <label class="form-label">ω_f [rad/s]</label>
+            <input type="number" step="1" class="form-control" id="wfInput" value="{{ omega_f }}">
+          </div>
+          <div>
+            <label class="form-label">t<sub>max</sub> [s]</label>
+            <input type="number" step="0.5" class="form-control" id="tmaxInput" value="25">
+          </div>
+          <div>
+            <label class="form-label">x₀ [m]</label>
+            <input type="number" step="0.1" class="form-control" id="x0Input" value="{{ x0 }}">
+          </div>
+          <div>
+            <label class="form-label">v₀ [m/s]</label>
+            <input type="number" step="0.1" class="form-control" id="v0Input" value="{{ v0 }}">
+          </div>
+        </div>
+
+        <!-- Info rápida -->
+        <div class="mb-2 d-flex flex-wrap gap-2 small">
+          <span class="badge-soft">
+            \(\Gamma = b/m =\)
+            <span id="GammaLabel" class="mathmono"></span>
+          </span>
+          <span class="badge-soft">
+            \(\omega_0 = \sqrt{k/m} =\)
+            <span id="omega0Label" class="mathmono"></span>
+          </span>
+          <span class="badge-soft">
+            \(\omega_f =\)
+            <span id="wfLabel" class="mathmono"></span>
+          </span>
+        </div>
+
+        <!-- SVG masa-resorte -->
+        <div class="mb-2 d-flex justify-content-center">
+          <svg viewBox="0 0 260 100" class="spring-svg">
+            <!-- Pared -->
+            <rect x="10" y="20" width="10" height="60" fill="#9ca3af"/>
+            <!-- Resorte -->
+            <polyline id="spring"
+                      points="20,50 40,50 50,40 60,60 70,40 80,60 90,40 100,60 110,50"
+                      fill="none" stroke="#2563eb" stroke-width="2"/>
+            <!-- Amortiguador (decorativo) -->
+            <line id="damper" x1="20" y1="35" x2="80" y2="35" stroke="#6b7280" stroke-width="3"/>
+
+            <!-- Masa -->
+            <rect id="massBlock" x="110" y="35" width="40" height="30" fill="#f97316"/>
+            <text x="113" y="30" font-size="9" fill="#374151">m</text>
+          </svg>
+        </div>
+
+        <!-- Slider de tiempo -->
+        <div class="mb-2">
+          <label class="form-label">Tiempo \(t\) [s]</label>
+          <input type="range" class="form-range" id="tSlider" min="0" max="25" step="0.01" value="0">
+          <div class="d-flex flex-wrap gap-2 small">
+            <span class="badge-soft">t = <span id="tVal" class="mathmono">0.00</span> s</span>
+            <span class="badge-soft">x(t) = <span id="xVal" class="mathmono">—</span> m</span>
+            <span class="badge-soft">v(t) = <span id="vVal" class="mathmono">—</span> m/s</span>
+          </div>
+        </div>
+
+        <!-- Gráficas -->
+        <div class="mb-2">
+          <canvas id="chartX" height="110"></canvas>
+        </div>
+        <div>
+          <canvas id="chartV" height="110"></canvas>
+        </div>
+        <p class="small text-muted mt-1 mb-0">
+          Observa cómo, tras un tiempo, la solución se vuelve casi periódica con frecuencia cercana a \(\omega_f\);
+          el slider y el bloque siguen exactamente la integración numérica.
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const kEl = document.getElementById('kInput');
+  const mEl = document.getElementById('mInput');
+  const bEl = document.getElementById('bInput');
+  const F0El = document.getElementById('F0Input');
+  const wfEl = document.getElementById('wfInput');
+  const x0El = document.getElementById('x0Input');
+  const v0El = document.getElementById('v0Input');
+  const tmaxEl = document.getElementById('tmaxInput');
+
+  const GammaLabel = document.getElementById('GammaLabel');
+  const omega0Label = document.getElementById('omega0Label');
+  const wfLabel = document.getElementById('wfLabel');
+
+  const massBlock = document.getElementById('massBlock');
+  const spring = document.getElementById('spring');
+  const damper = document.getElementById('damper');
+
+  const tSlider = document.getElementById('tSlider');
+  const tValSpan = document.getElementById('tVal');
+  const xValSpan = document.getElementById('xVal');
+  const vValSpan = document.getElementById('vVal');
+
+  let chartX = null;
+  let chartV = null;
+  let tData = [];
+  let xData = [];
+  let vData = [];
+
+  function boundsWithMargin(arr, frac = 0.12) {
+    let min = Math.min(...arr);
+    let max = Math.max(...arr);
+    if (!isFinite(min) || !isFinite(max)) return {min:-1,max:1};
+    if (min === max) { min -= 1; max += 1; }
+    const span = max - min;
+    return { min: min - frac*span, max: max + frac*span };
+  }
+
+  // ===== RK4 para el sistema forzado =====
+  function rk4_step_forzado(Gamma, omega0, F0m, wf, x, v, t, dt){
+    const f1x = (x,v,t)=>v;
+    const f1v = (x,v,t)=>F0m*Math.cos(wf*t) - Gamma*v - (omega0*omega0)*x;
+
+    const k1x = dt*f1x(x, v, t);
+    const k1v = dt*f1v(x, v, t);
+
+    const k2x = dt*f1x(x+0.5*k1x, v+0.5*k1v, t+0.5*dt);
+    const k2v = dt*f1v(x+0.5*k1x, v+0.5*k1v, t+0.5*dt);
+
+    const k3x = dt*f1x(x+0.5*k2x, v+0.5*k2v, t+0.5*dt);
+    const k3v = dt*f1v(x+0.5*k2x, v+0.5*k2v, t+0.5*dt);
+
+    const k4x = dt*f1x(x+k3x, v+k3v, t+dt);
+    const k4v = dt*f1v(x+k3x, v+k3v, t+dt);
+
+    const xn = x + (k1x+2*k2x+2*k3x+k4x)/6;
+    const vn = v + (k1v+2*k2v+2*k3v+k4v)/6;
+    return [xn,vn];
+  }
+
+  // ===== Simular con parámetros actuales =====
+  function simulate(){
+    let k = parseFloat(kEl.value) || 50;
+    let m = parseFloat(mEl.value) || 0.5;
+    let b = parseFloat(bEl.value) || 0.5;
+    let F0 = parseFloat(F0El.value) || 70;
+    let wf = parseFloat(wfEl.value) || 30;
+    let x0 = parseFloat(x0El.value) || 10;
+    let v0 = parseFloat(v0El.value) || 0;
+    let tmax = parseFloat(tmaxEl.value) || 25;
+
+    if (m <= 0) m = 0.5;
+    if (k <= 0) k = 1;
+    if (tmax <= 0) tmax = 5;
+
+    const Gamma = b / m;
+    const omega0 = Math.sqrt(k / m);
+    const F0m = F0 / m;
+
+    GammaLabel.textContent = Gamma.toFixed(3);
+    omega0Label.textContent = omega0.toFixed(3);
+    wfLabel.textContent = wf.toFixed(2);
+
+    const N = 2500;
+    const dt = tmax / N;
+
+    tData = [];
+    xData = [];
+    vData = [];
+
+    let x = x0;
+    let v = v0;
+
+    for (let i=0; i<=N; i++){
+      const t = i*dt;
+      tData.push(t);
+      xData.push(x);
+      vData.push(v);
+      [x,v] = rk4_step_forzado(Gamma, omega0, F0m, wf, x, v, t, dt);
+    }
+
+    tSlider.min = 0;
+    tSlider.max = tmax.toFixed(2);
+    if (parseFloat(tSlider.value) > tmax) tSlider.value = tmax;
+
+    buildOrUpdateCharts();
+    updateFromSlider();
+
+    if (window.MathJax && MathJax.typesetPromise){
+      MathJax.typesetPromise().catch(()=>{});
+    }
+  }
+
+  // ===== Construir / actualizar gráficas =====
+  function buildOrUpdateCharts(){
+    const markerX = new Array(tData.length).fill(null);
+    const markerV = new Array(tData.length).fill(null);
+
+    const bx = boundsWithMargin(xData);
+    const bv = boundsWithMargin(vData);
+
+    // x(t)
+    if (!chartX){
+      chartX = new Chart(document.getElementById('chartX').getContext('2d'), {
+        type:'line',
+        data:{
+          labels:tData,
+          datasets:[
+            {label:'x(t)', data:xData, pointRadius:0, tension:0.15},
+            {label:'t seleccionado', data:markerX, pointRadius:4, showLine:false}
+          ]
+        },
+        options:{
+          animation:false,
+          responsive:true,
+          scales:{
+            x:{
+              title:{display:true,text:'t [s]'},
+              ticks:{autoSkip:true,maxTicksLimit:6,maxRotation:0,minRotation:0}
+            },
+            y:{
+              title:{display:true,text:'x(t) [m]'},
+              suggestedMin:bx.min,
+              suggestedMax:bx.max
+            }
+          },
+          plugins:{legend:{display:false}}
+        }
+      });
+    } else {
+      chartX.data.labels = tData;
+      chartX.data.datasets[0].data = xData;
+      chartX.data.datasets[1].data = markerX;
+      chartX.options.scales.y.suggestedMin = bx.min;
+      chartX.options.scales.y.suggestedMax = bx.max;
+      chartX.update();
+    }
+
+    // v(t)
+    if (!chartV){
+      chartV = new Chart(document.getElementById('chartV').getContext('2d'), {
+        type:'line',
+        data:{
+          labels:tData,
+          datasets:[
+            {label:'v(t)', data:vData, pointRadius:0, tension:0.15},
+            {label:'t seleccionado', data:markerV, pointRadius:4, showLine:false}
+          ]
+        },
+        options:{
+          animation:false,
+          responsive:true,
+          scales:{
+            x:{
+              title:{display:true,text:'t [s]'},
+              ticks:{autoSkip:true,maxTicksLimit:6,maxRotation:0,minRotation:0}
+            },
+            y:{
+              title:{display:true,text:'v(t) [m/s]'},
+              suggestedMin:bv.min,
+              suggestedMax:bv.max
+            }
+          },
+          plugins:{legend:{display:false}}
+        }
+      });
+    } else {
+      chartV.data.labels = tData;
+      chartV.data.datasets[0].data = vData;
+      chartV.data.datasets[1].data = markerV;
+      chartV.options.scales.y.suggestedMin = bv.min;
+      chartV.options.scales.y.suggestedMax = bv.max;
+      chartV.update();
+    }
+  }
+
+  // ===== Actualizar SVG + marcadores con el slider =====
+  function updateFromSlider(){
+    if (!tData.length) return;
+
+    const tSel = parseFloat(tSlider.value) || 0;
+    const tMax = tData[tData.length-1];
+    const frac = Math.max(0, Math.min(1, tSel / tMax));
+    const idx = Math.round(frac * (tData.length - 1));
+
+    const xSel = xData[idx];
+    const vSel = vData[idx];
+
+    tValSpan.textContent = tSel.toFixed(2);
+    xValSpan.textContent = xSel.toFixed(3);
+    vValSpan.textContent = vSel.toFixed(3);
+
+    const baseX = 110;
+    const scale = 3.5; // píxeles por metro
+    const shift = xSel * scale;
+    massBlock.setAttribute('x', baseX + shift);
+
+    const springBase = "20,50 40,50 50,40 60,60 70,40 80,60 90,40";
+    const endX = baseX + shift;
+    spring.setAttribute('points', springBase + ` ${endX},60`);
+    damper.setAttribute('x2', Math.max(40, endX - 40));
+
+    if (chartX && chartV){
+      const mx = chartX.data.datasets[1].data;
+      const mv = chartV.data.datasets[1].data;
+      for (let i=0;i<mx.length;i++){ mx[i]=null; mv[i]=null; }
+      mx[idx] = xSel;
+      mv[idx] = vSel;
+      chartX.update('none');
+      chartV.update('none');
+    }
+  }
+
+  // Eventos
+  [kEl,mEl,bEl,F0El,wfEl,x0El,v0El,tmaxEl].forEach(el => {
+    el.addEventListener('input', simulate);
+    el.addEventListener('change', simulate);
+  });
+
+  tSlider.addEventListener('input', updateFromSlider);
+
+  // Init
+  simulate();
+});
+</script>
+{% endblock %}
