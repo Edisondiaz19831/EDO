@@ -66,6 +66,59 @@
     font-size:0.72rem;
     color:#6b7280;
   }
+
+  /* Contenedor con scroll horizontal para pantallas pequeñas */
+.flow-diagram-wrapper {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 6px;
+  margin-bottom: 10px;
+}
+
+.flow-diagram {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.78rem;
+  min-width: 500px; /* ancho mínimo del diagrama */
+}
+
+.flow-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: nowrap; /* evita que se rompa en varias filas */
+}
+
+.node {
+  padding: 4px 10px;
+  border-radius: 10px;
+  border: 1px solid #9ca3af;
+  background: #f9fafb;
+  color: #111827;
+  font-size: 0.78rem;
+  text-align: center;
+  min-width: 90px;
+  white-space: nowrap;
+}
+
+.node-y { background: #fef3c7; }
+.node-z { background: #e0f2fe; }
+.arrow {
+  font-size: 0.8rem;
+  color: #6b7280;
+  white-space: nowrap;
+}
+.arrow-vert {
+  margin: 2px 0;
+  color: #6b7280;
+}
+.small-note {
+  font-size: 0.72rem;
+  color: #6b7280;
+}
+
 </style>
 {% endblock %}
 
@@ -128,70 +181,33 @@
         </p>
 
         <!-- 3. Diagrama visual -->
-        <h6 class="mb-1">3. Diagrama de flujos (la idea del profe)</h6>
-        <div class="flow-diagram">
-          <div class="flow-row">
-            <div class="node">
-              SANOS<br>\(x(t)\)
-            </div>
-            <div class="arrow">
-              contagio<br>
-              \(c\,\beta_1 \frac{y}{N}x\), \(c\,\beta_2 \frac{z}{N}x\)
-            </div>
-            <div class="node node-y">
-              INFECTADOS<br>sin trat. \(y(t)\)
-            </div>
-            <div class="arrow">
-              tratamiento<br>\(\tau y\)
-            </div>
-            <div class="node node-z">
-              INFECTADOS<br>con trat. \(z(t)\)
-            </div>
-          </div>
-          <div class="arrow-vert small-note">
-            Salidas por muerte:
-            \( \mu x,\; (\mu+\delta)y,\; (\mu+d)z \).
-          </div>
-        </div>
-        <p class="small text-muted mb-2">
-          Cada flecha del diagrama se vuelve un término en las ecuaciones
-          diferenciales. Es pura contabilidad de personas.
-        </p>
-
-        <!-- 4. Parámetros -->
-        <h6 class="mb-1">4. Parámetros del modelo</h6>
-        <table class="table table-sm table-bordered mb-3">
-          <tbody class="small">
-            <tr>
-              <th>c</th>
-              <td>Contactos sexuales promedio por persona y unidad de tiempo.</td>
-            </tr>
-            <tr>
-              <th>\(\beta_1\)</th>
-              <td>Prob. de contagio en un contacto con infectado sin tratamiento (\(y\)).</td>
-            </tr>
-            <tr>
-              <th>\(\beta_2\)</th>
-              <td>Prob. de contagio en un contacto con infectado tratado (\(z\)).</td>
-            </tr>
-            <tr>
-              <th>\(\mu\)</th>
-              <td>Mortalidad natural.</td>
-            </tr>
-            <tr>
-              <th>\(\delta\)</th>
-              <td>Mortalidad extra por SIDA sin tratamiento.</td>
-            </tr>
-            <tr>
-              <th>\(\tau\)</th>
-              <td>Tasa con la que un infectado sin tratar entra a tratamiento (\(y \to z\)).</td>
-            </tr>
-            <tr>
-              <th>d</th>
-              <td>Mortalidad extra en infectados tratados.</td>
-            </tr>
-          </tbody>
-        </table>
+<h6 class="mb-1">3. Diagrama de flujos (la idea del profe)</h6>
+<div class="flow-diagram-wrapper">
+  <div class="flow-diagram">
+    <div class="flow-row">
+      <div class="node">
+        SANOS<br>\(x(t)\)
+      </div>
+      <div class="arrow">
+        contagio<br>
+        \(c\,\beta_1 \frac{y}{N}x\), \(c\,\beta_2 \frac{z}{N}x\)
+      </div>
+      <div class="node node-y">
+        INFECTADOS<br>sin trat. \(y(t)\)
+      </div>
+      <div class="arrow">
+        tratamiento<br>\(\tau y\)
+      </div>
+      <div class="node node-z">
+        INFECTADOS<br>con trat. \(z(t)\)
+      </div>
+    </div>
+    <div class="arrow-vert small-note">
+      Salidas por muerte:
+      \( \mu x,\; (\mu+\delta)y,\; (\mu+d)z \).
+    </div>
+  </div>
+</div>
 
         <!-- 5. Probabilidades de contagio -->
         <h6 class="mb-1">5. De dónde sale \(c\,\beta_1 \dfrac{y}{N} x\)</h6>
