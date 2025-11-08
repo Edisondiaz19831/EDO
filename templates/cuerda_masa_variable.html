@@ -16,10 +16,45 @@
   }
   .dropdown-header.text-muted { font-size:.8rem; text-transform:uppercase; letter-spacing:.05em; }
 
+  /* ESTILOS NUEVOS PARA EVITAR DESBORDAMIENTO DE FÓRMULAS */
+  .card-body {
+    overflow-x: auto;
+  }
+  
+  .card-body mjx-container {
+    max-width: 100%;
+    overflow-x: auto;
+    display: block !important;
+  }
+  
+  /* Asegurar que las fórmulas sean responsive */
+  mjx-math {
+    max-width: 100%;
+  }
+  
+  /* Para pantallas pequeñas */
   @media (max-width: 768px) {
     .rope-card-wrap { flex-direction:column; align-items:center; }
+    
+    .card-body {
+      padding: 1rem;
+    }
+    
+    .card-body p.small,
+    .card-body ul.small,
+    .card-body h6 {
+      word-wrap: break-word;
+    }
+    
+    /* Reducir tamaño de fuente en móviles para mejor legibilidad */
+    .card-body {
+      font-size: 0.9rem;
+    }
+    
+    .card-body h6 {
+      font-size: 0.95rem;
+    }
   }
-
 
   .rope-card-wrap {
     display:flex;
@@ -37,7 +72,7 @@
 
   .rope-svg {
     width:100%;
-    max-width:320px;   /* súbelo a 360 si la quieres aún más grande */
+    max-width:320px;
     height:auto;
   }
 
@@ -54,7 +89,30 @@
     .rope-card-wrap { flex-direction:column; align-items:center; }
   }
 
-
+  /* Estilos adicionales para mejorar la visualización en móviles */
+  @media (max-width: 576px) {
+    .container {
+      padding-left: 10px;
+      padding-right: 10px;
+    }
+    
+    .card-body {
+      padding: 0.75rem;
+    }
+    
+    /* Mejorar espaciado en formularios móviles */
+    .form-control {
+      font-size: 0.9rem;
+    }
+    
+    .form-label {
+      font-size: 0.85rem;
+    }
+    
+    .form-text {
+      font-size: 0.8rem;
+    }
+  }
 </style>
 {% endblock %}
 
@@ -271,84 +329,72 @@
         <hr>
 
         <!-- Diagrama interactivo de la cuerda -->
-       
+        <div class="rope-card-wrap mt-2">
+          <div class="rope-diagram-container">
+            <svg id="ropeSvg"
+                 viewBox="0 0 260 220"
+                 class="rope-svg"
+                 aria-label="Cuerda sobre mesa">
+              <!-- Mesa -->
+              <rect x="20" y="80" width="220" height="10" fill="#e5e5e5" />
+              <!-- Borde de la mesa -->
+              <line x1="170" y1="50" x2="170" y2="200" stroke="#999" stroke-width="2" stroke-dasharray="4 3" />
+              <text x="175" y="65" font-size="9" fill="#555">Borde</text>
 
+              <!-- Cuerda sobre la mesa -->
+              <line id="ropeTable"
+                    x1="30" y1="85"
+                    x2="190" y2="85"
+                    stroke="#c77d1a"
+                    stroke-width="4"
+                    stroke-linecap="round" />
 
+              <!-- Cuerda colgante -->
+              <line id="ropeHang"
+                    x1="190" y1="85"
+                    x2="190" y2="85"
+                    stroke="#c77d1a"
+                    stroke-width="4"
+                    stroke-linecap="round" />
 
+              <!-- Flecha x -->
+              <line id="xArrow"
+                    x1="205" y1="85"
+                    x2="205" y2="160"
+                    stroke="#222"
+                    stroke-width="1.5"
+                    marker-end="url(#arrowDown)" />
+              <text id="xLabel"
+                    x="210" y="120"
+                    font-size="10"
+                    fill="#222">x</text>
 
+              <text x="30" y="75" font-size="9" fill="#555">Parte sobre mesa</text>
+              <text x="120" y="200" font-size="9" fill="#555">Parte colgante</text>
 
+              <defs>
+                <marker id="arrowDown" markerWidth="8" markerHeight="8"
+                        refX="3" refY="2.5" orient="auto" markerUnits="strokeWidth">
+                  <path d="M0,0 L0,5 L5,2.5 z" fill="#222" />
+                </marker>
+              </defs>
+            </svg>
+          </div>
+        </div>
 
-<div class="rope-card-wrap mt-2">
-  <div class="rope-diagram-container">
-    <svg id="ropeSvg"
-         viewBox="0 0 260 220"
-         class="rope-svg"
-         aria-label="Cuerda sobre mesa">
-      <!-- Mesa -->
-      <rect x="20" y="80" width="220" height="10" fill="#e5e5e5" />
-      <!-- Borde de la mesa -->
-      <line x1="170" y1="50" x2="170" y2="200" stroke="#999" stroke-width="2" stroke-dasharray="4 3" />
-      <text x="175" y="65" font-size="9" fill="#555">Borde</text>
+        <div class="small text-muted">
+          La cuerda naranja muestra la parte sobre la mesa y la parte colgante.
+          A medida que \(x\) aumenta, la porción colgante crece y la velocidad \(v(x)\) también.
+        </div>
 
-      <!-- Cuerda sobre la mesa -->
-      <line id="ropeTable"
-            x1="30" y1="85"
-            x2="190" y2="85"
-            stroke="#c77d1a"
-            stroke-width="4"
-            stroke-linecap="round" />
+        <hr>
 
-      <!-- Cuerda colgante -->
-      <line id="ropeHang"
-            x1="190" y1="85"
-            x2="190" y2="85"
-            stroke="#c77d1a"
-            stroke-width="4"
-            stroke-linecap="round" />
-
-      <!-- Flecha x -->
-      <line id="xArrow"
-            x1="205" y1="85"
-            x2="205" y2="160"
-            stroke="#222"
-            stroke-width="1.5"
-            marker-end="url(#arrowDown)" />
-      <text id="xLabel"
-            x="210" y="120"
-            font-size="10"
-            fill="#222">x</text>
-
-      <text x="30" y="75" font-size="9" fill="#555">Parte sobre mesa</text>
-      <text x="120" y="200" font-size="9" fill="#555">Parte colgante</text>
-
-      <defs>
-        <marker id="arrowDown" markerWidth="8" markerHeight="8"
-                refX="3" refY="2.5" orient="auto" markerUnits="strokeWidth">
-          <path d="M0,0 L0,5 L5,2.5 z" fill="#222" />
-        </marker>
-      </defs>
-    </svg>
-      
-</div>
-
-  </div>
-
-
-<div class="small text-muted">
-    La cuerda naranja muestra la parte sobre la mesa y la parte colgante.
-    A medida que \(x\) aumenta, la porción colgante crece y la velocidad \(v(x)\) también.
-  </div>
-
-
-<hr>
-
-<h6 class="mt-3 mb-1">Gráfica de \(v(x)\)</h6>
-<p class="small text-muted">
-  La curva muestra la solución analítica \(v(x)\).
-  El tramo resaltado corresponde a la longitud colgante actual seleccionada con el slider.
-</p>
-<canvas id="vChart" height="180"></canvas>
-
+        <h6 class="mt-3 mb-1">Gráfica de \(v(x)\)</h6>
+        <p class="small text-muted">
+          La curva muestra la solución analítica \(v(x)\).
+          El tramo resaltado corresponde a la longitud colgante actual seleccionada con el slider.
+        </p>
+        <canvas id="vChart" height="180"></canvas>
 
       </div>
     </div>
