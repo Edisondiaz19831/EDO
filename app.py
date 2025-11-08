@@ -254,6 +254,133 @@ def tanque_oscilador():
         h0=h0, x0=x0, v0=v0
     )
 
+@app.route("/modelo-sida", methods=["GET", "POST"])
+def modelo_sida():
+    # -----------------------------
+    # Valores por defecto
+    # -----------------------------
+    # Población inicial
+    N0_default = 1000
+    x0_default = 990   # susceptibles
+    y0_default = 10    # infectados sin tratamiento
+    z0_default = 0     # infectados con tratamiento
+
+    # Parámetros epidemiológicos (valores ilustrativos)
+    c_default      = 1.0     # contactos promedio por unidad de tiempo
+    beta1_default  = 0.30    # prob contagio con infectado sin tratar
+    beta2_default  = 0.05    # prob contagio con infectado tratado
+    mu_default     = 0.0001  # muerte natural
+    delta_default  = 0.01    # muerte por SIDA sin tratamiento
+    tau_default    = 0.10    # paso a tratamiento
+    d_default      = 0.005   # muerte en tratados
+
+    # Tiempo de simulación
+    T_default  = 365.0       # días
+    dt_default = 1.0         # paso (día)
+
+    # -----------------------------
+    # Leer datos del formulario
+    # -----------------------------
+    if request.method == "POST":
+        def get_float(name, default):
+            try:
+                return float(request.form.get(name, default))
+            except (TypeError, ValueError):
+                return default
+
+        x0 = get_float("x0", x0_default)
+        y0 = get_float("y0", y0_default)
+        z0 = get_float("z0", z0_default)
+
+        c     = get_float("c", c_default)
+        beta1 = get_float("beta1", beta1_default)
+        beta2 = get_float("beta2", beta2_default)
+        mu    = get_float("mu", mu_default)
+        delta = get_float("delta", delta_default)
+        tau   = get_float("tau", tau_default)
+        d     = get_float("d", d_default)
+
+        T  = get_float("T", T_default)
+        dt = get_float("dt", dt_default)
+    else:
+        x0, y0, z0 = x0_default, y0_default, z0_default
+        c, beta1, beta2 = c_default, beta1_default, beta2_default
+        mu, delta, tau, d = mu_default, delta_default, tau_default, d_default
+        T, dt = T_default, dt_default
+
+    # Asegurar cosas razonables
+    if T <= 0:
+        T = T_default
+    if dt <= 0:
+        dt = dt_default
+
+    # -----------------------------
+    # Simulación numérica (Euler)
+    # -----------------------------
+    t_vals = []
+    x_vals = []
+    y_vals = []
+    z_vals = []
+
+    x = max(x0, 0.0)
+    y = max(y0, 0.0)
+    z = max(z0, 0.0)
+
+    steps = int(T / dt)
+
+    for n in range(steps + 1):
+        t = n * dt
+        t_vals.append(t)
+        x_vals.append(x)
+        y_vals.append(y)
+        z_vals.append(z)
+
+        N = x + y + z
+        if N <= 0:
+            break  # se extinguió la población
+
+        # Ecuaciones del modelo:
+        # dx/dt = -μ x - c β1 (y/N) x - c β2 (z/N) x
+        # dy/dt = c β1 (y/N) x + c β2 (z/N) x - μ y - δ y - τ y
+        # dz/dt = τ y - μ z - d z
+
+        dxdt = -mu * x - c * beta1 * (y / N) * x - c * beta2 * (z / N) * x
+        dydt = (
+            c * beta1 * (y / N) * x
+            + c * beta2 * (z / N) * x
+            - mu * y
+            - delta * y
+            - tau * y
+        )
+        dzdt = tau * y - mu * z - d * z
+
+        # Paso de Euler
+        x_new = x + dxdt * dt
+        y_new = y + dydt * dt
+        z_new = z + dzdt * dt
+
+        # Evitar negativos por error numérico
+        x = max(x_new, 0.0)
+        y = max(y_new, 0.0)
+        z = max(z_new, 0.0)
+
+    # -----------------------------
+    # Renderizar
+    # -----------------------------
+    return render_template(
+        "modelo_sida.html",
+        # parámetros y CI para rellenar el formulario
+        x0=x0, y0=y0, z0=z0,
+        c=c, beta1=beta1, beta2=beta2,
+        mu=mu, delta=delta, tau=tau, d=d,
+        T=T, dt=dt,
+        # datos de serie para la gráfica
+        t_vals=t_vals,
+        x_vals=x_vals,
+        y_vals=y_vals,
+        z_vals=z_vals,
+    )
+
 
 if __name__ == "__main__":
     app.run(debug=True)

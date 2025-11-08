@@ -1,0 +1,551 @@
+{% extends "base.html" %}
+{% block title %}Modelo SIDA — Laboratorio interactivo{% endblock %}
+
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<style>
+  .mathmono {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  }
+  .badge-soft {
+    background:#eef2ff;
+    color:#1e2a78;
+    border:1px solid #c7d2fe;
+    border-radius:8px;
+    padding:2px 8px;
+    font-size:.8rem;
+  }
+  .param-grid{
+    display:grid;
+    grid-template-columns:repeat(3,minmax(0,1fr));
+    gap:10px;
+  }
+  @media (max-width: 768px) {
+    .param-grid{ grid-template-columns:repeat(2,minmax(0,1fr)); }
+  }
+  .table-sm td, .table-sm th {
+    padding: .25rem .5rem;
+    font-size: .78rem;
+  }
+  /* Diagrama de flujos */
+  .flow-diagram {
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:4px;
+    font-size:0.78rem;
+    margin-bottom:8px;
+  }
+  .flow-row {
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .node {
+    padding:4px 10px;
+    border-radius:10px;
+    border:1px solid #9ca3af;
+    background:#f9fafb;
+    color:#111827;
+    font-size:0.78rem;
+    text-align:center;
+    min-width:90px;
+  }
+  .node-y { background:#fef3c7; }
+  .node-z { background:#e0f2fe; }
+  .arrow {
+    font-size:0.8rem;
+    color:#6b7280;
+  }
+  .arrow-vert {
+    margin:2px 0;
+    color:#6b7280;
+  }
+  .small-note {
+    font-size:0.72rem;
+    color:#6b7280;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+
+  <!-- IZQUIERDA: explicación didáctica completa -->
+  <div class="col-lg-5">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h5 class="card-title mb-3">Cómo nace el modelo SIDA paso a paso</h5>
+
+        <!-- 1. Suposiciones -->
+        <h6 class="mb-1">1. Suposiciones del modelo</h6>
+        <table class="table table-sm table-bordered align-middle mb-3">
+          <thead class="table-light">
+            <tr>
+              <th class="text-center">#</th>
+              <th>Suposición</th>
+              <th>Consecuencia en el modelo</th>
+            </tr>
+          </thead>
+          <tbody class="small">
+            <tr>
+              <td class="text-center">1</td>
+              <td>Todo contagio es por contacto sexual.</td>
+              <td>El contagio depende del número de contactos \(c\) y de las probabilidades \( \beta_1, \beta_2 \).</td>
+            </tr>
+            <tr>
+              <td class="text-center">2</td>
+              <td>No hay cura definitiva.</td>
+              <td>No se vuelve al grupo de sanos: el flujo es \(x \to y \to z\).</td>
+            </tr>
+            <tr>
+              <td class="text-center">3</td>
+              <td>El tratamiento mejora la situación, pero no elimina el virus.</td>
+              <td>Se crea el grupo \(z(t)\): infectados con tratamiento, con otras tasas.</td>
+            </tr>
+            <tr>
+              <td class="text-center">4</td>
+              <td>Una persona infectada puede recibir tratamiento.</td>
+              <td>Aparece una tasa de paso \(\tau\) desde \(y\) hacia \(z\).</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <!-- 2. Variables -->
+        <h6 class="mb-1">2. Variables y población total</h6>
+        <ul class="small mb-1">
+          <li>\(x(t)\): número de personas sanas susceptibles.</li>
+          <li>\(y(t)\): número de infectados sin tratamiento.</li>
+          <li>\(z(t)\): número de infectados con tratamiento.</li>
+        </ul>
+        <p class="small text-muted mb-2">
+          Población total:
+          \[
+          N(t) = x(t) + y(t) + z(t).
+          \]
+          Usamos \(N(t)\) para expresar probabilidades de encontrarse con alguien de cada grupo.
+        </p>
+
+        <!-- 3. Diagrama visual -->
+        <h6 class="mb-1">3. Diagrama de flujos (la idea del profe)</h6>
+        <div class="flow-diagram">
+          <div class="flow-row">
+            <div class="node">
+              SANOS<br>\(x(t)\)
+            </div>
+            <div class="arrow">
+              contagio<br>
+              \(c\,\beta_1 \frac{y}{N}x\), \(c\,\beta_2 \frac{z}{N}x\)
+            </div>
+            <div class="node node-y">
+              INFECTADOS<br>sin trat. \(y(t)\)
+            </div>
+            <div class="arrow">
+              tratamiento<br>\(\tau y\)
+            </div>
+            <div class="node node-z">
+              INFECTADOS<br>con trat. \(z(t)\)
+            </div>
+          </div>
+          <div class="arrow-vert small-note">
+            Salidas por muerte:
+            \( \mu x,\; (\mu+\delta)y,\; (\mu+d)z \).
+          </div>
+        </div>
+        <p class="small text-muted mb-2">
+          Cada flecha del diagrama se vuelve un término en las ecuaciones
+          diferenciales. Es pura contabilidad de personas.
+        </p>
+
+        <!-- 4. Parámetros -->
+        <h6 class="mb-1">4. Parámetros del modelo</h6>
+        <table class="table table-sm table-bordered mb-3">
+          <tbody class="small">
+            <tr>
+              <th>c</th>
+              <td>Contactos sexuales promedio por persona y unidad de tiempo.</td>
+            </tr>
+            <tr>
+              <th>\(\beta_1\)</th>
+              <td>Prob. de contagio en un contacto con infectado sin tratamiento (\(y\)).</td>
+            </tr>
+            <tr>
+              <th>\(\beta_2\)</th>
+              <td>Prob. de contagio en un contacto con infectado tratado (\(z\)).</td>
+            </tr>
+            <tr>
+              <th>\(\mu\)</th>
+              <td>Mortalidad natural.</td>
+            </tr>
+            <tr>
+              <th>\(\delta\)</th>
+              <td>Mortalidad extra por SIDA sin tratamiento.</td>
+            </tr>
+            <tr>
+              <th>\(\tau\)</th>
+              <td>Tasa con la que un infectado sin tratar entra a tratamiento (\(y \to z\)).</td>
+            </tr>
+            <tr>
+              <th>d</th>
+              <td>Mortalidad extra en infectados tratados.</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <!-- 5. Probabilidades de contagio -->
+        <h6 class="mb-1">5. De dónde sale \(c\,\beta_1 \dfrac{y}{N} x\)</h6>
+        <p class="small mb-1">
+          1) Cada sano tiene en promedio \(c\) contactos sexuales por unidad de tiempo.
+        </p>
+        <p class="small mb-1">
+          2) Probabilidad de que el contacto sea con alguien de \(y\):
+          \(\dfrac{y}{N}\).
+        </p>
+        <p class="small mb-1">
+          3) Probabilidad de contagio dado ese contacto:
+          \(\beta_1\).
+        </p>
+        <p class="small mb-1">
+          Multiplicando:
+          \[
+          \text{nuevos contagios desde } y
+          = c\,\beta_1 \frac{y}{N} x.
+          \]
+        </p>
+        <p class="small mb-2">
+          Igual con infectados tratados:
+          \[
+          c\,\beta_2 \frac{z}{N} x.
+          \]
+          Estos términos restan en \(dx/dt\) (salen sanos) y suman en \(dy/dt\).
+        </p>
+
+        <!-- 6. Balance -->
+        <h6 class="mb-1">6. Balance entradas − salidas</h6>
+        <table class="table table-sm table-bordered mb-2">
+          <thead class="table-light">
+            <tr>
+              <th>Grupo</th>
+              <th class="small">Entradas</th>
+              <th class="small">Salidas</th>
+            </tr>
+          </thead>
+          <tbody class="small">
+            <tr>
+              <td>\(x(t)\)</td>
+              <td>—</td>
+              <td>\(\mu x\), contagio con \(y\), contagio con \(z\).</td>
+            </tr>
+            <tr>
+              <td>\(y(t)\)</td>
+              <td>\(c\beta_1 \dfrac{y}{N}x + c\beta_2 \dfrac{z}{N}x\)</td>
+              <td>\(\mu y\), \(\delta y\), \(\tau y\).</td>
+            </tr>
+            <tr>
+              <td>\(z(t)\)</td>
+              <td>\(\tau y\)</td>
+              <td>\(\mu z\), \(d z\).</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <p class="small mb-1">
+          Aplicando “entradas − salidas”:
+        </p>
+        <div class="mathmono small">
+          \[
+          \begin{aligned}
+          \frac{dx}{dt} &= - \mu x
+                          - c \beta_1 \frac{y}{N} x
+                          - c \beta_2 \frac{z}{N} x, \\[4pt]
+          \frac{dy}{dt} &= c \beta_1 \frac{y}{N} x
+                          + c \beta_2 \frac{z}{N} x
+                          - (\mu + \delta + \tau) y, \\[4pt]
+          \frac{dz}{dt} &= \tau y - (\mu + d) z, \\[4pt]
+          N(t) &= x + y + z.
+          \end{aligned}
+          \]
+        </div>
+
+        <!-- 7. Interpretación -->
+        <h6 class="mb-1">7. Cómo interpretar las curvas</h6>
+        <ul class="small text-muted mb-0">
+          <li>\(x(t)\): sanos (azul). Disminuye si hay mucho contagio.</li>
+          <li>\(y(t)\): infectados sin tratamiento (rosa). Sube, hace un pico (ola) y baja.</li>
+          <li>\(z(t)\): infectados tratados (naranja). Crece con \(\tau\).</li>
+          <li>El modelo es en función del tiempo:
+              moveremos un punto sobre las curvas para “ver” la historia momento a momento.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- DERECHA: simulador interactivo -->
+  <div class="col-lg-7">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h5 class="card-title mb-3">Simulación interactiva del modelo</h5>
+
+        <!-- Parámetros -->
+        <form method="post" class="param-grid mb-3">
+          <!-- Condiciones iniciales -->
+          <div>
+            <label class="form-label">x₀ (sanos)</label>
+            <input type="number" step="1" min="0" name="x0"
+                   class="form-control form-control-sm" value="{{ x0 }}">
+          </div>
+          <div>
+            <label class="form-label">y₀ (sin trat.)</label>
+            <input type="number" step="1" min="0" name="y0"
+                   class="form-control form-control-sm" value="{{ y0 }}">
+          </div>
+          <div>
+            <label class="form-label">z₀ (tratados)</label>
+            <input type="number" step="1" min="0" name="z0"
+                   class="form-control form-control-sm" value="{{ z0 }}">
+          </div>
+
+          <!-- Contacto / contagio -->
+          <div>
+            <label class="form-label">c (contactos)</label>
+            <input type="number" step="0.01" min="0" name="c"
+                   class="form-control form-control-sm" value="{{ c }}">
+          </div>
+          <div>
+            <label class="form-label">β₁ (con Y)</label>
+            <input type="number" step="0.01" min="0" name="beta1"
+                   class="form-control form-control-sm" value="{{ beta1 }}">
+          </div>
+          <div>
+            <label class="form-label">β₂ (con Z)</label>
+            <input type="number" step="0.01" min="0" name="beta2"
+                   class="form-control form-control-sm" value="{{ beta2 }}">
+          </div>
+
+          <!-- Tasas -->
+          <div>
+            <label class="form-label">μ (muerte nat.)</label>
+            <input type="number" step="0.0001" min="0" name="mu"
+                   class="form-control form-control-sm" value="{{ mu }}">
+          </div>
+          <div>
+            <label class="form-label">δ (muerte Y)</label>
+            <input type="number" step="0.0001" min="0" name="delta"
+                   class="form-control form-control-sm" value="{{ delta }}">
+          </div>
+          <div>
+            <label class="form-label">τ (Y → Z)</label>
+            <input type="number" step="0.0001" min="0" name="tau"
+                   class="form-control form-control-sm" value="{{ tau }}">
+          </div>
+          <div>
+            <label class="form-label">d (muerte Z)</label>
+            <input type="number" step="0.0001" min="0" name="d"
+                   class="form-control form-control-sm" value="{{ d }}">
+          </div>
+
+          <!-- Tiempo -->
+          <div>
+            <label class="form-label">T (tiempo total)</label>
+            <input type="number" step="1" min="1" name="T"
+                   class="form-control form-control-sm" value="{{ T }}">
+          </div>
+          <div>
+            <label class="form-label">Δt (paso)</label>
+            <input type="number" step="0.1" min="0.01" name="dt"
+                   class="form-control form-control-sm" value="{{ dt }}">
+          </div>
+
+          <div class="d-flex align-items-end">
+            <button type="submit" class="btn btn-primary btn-sm w-100">
+              Actualizar simulación
+            </button>
+          </div>
+        </form>
+
+        <!-- Badges resumen -->
+        <div class="mb-3 d-flex flex-wrap gap-2 small">
+          <span class="badge-soft">
+            N₀ = x₀ + y₀ + z₀ =
+            <span class="mathmono">
+              {{ (x0 + y0 + z0)|round(2) }}
+            </span>
+          </span>
+          <span class="badge-soft">
+            Infectados iniciales =
+            <span class="mathmono">
+              {% set N0 = x0 + y0 + z0 %}
+              {% if N0 > 0 %}
+                {{ ((y0 + z0) / N0 * 100)|round(2) }}%
+              {% else %}
+                0%
+              {% endif %}
+            </span>
+          </span>
+        </div>
+
+        <!-- Gráfica -->
+        <div class="mb-2">
+          <canvas id="sidaChart" height="140"></canvas>
+        </div>
+
+        <!-- Slider de tiempo + valores actuales -->
+        <div class="mb-2">
+          <label for="tSlider" class="form-label small mb-1">
+            Tiempo seleccionado \(t\)
+          </label>
+          <input type="range" class="form-range" id="tSlider" min="0" max="1" step="1" value="0">
+          <div class="d-flex flex-wrap gap-2 small mt-1">
+            <span class="badge-soft">
+              \(t =\) <span class="mathmono" id="tVal">0</span>
+            </span>
+            <span class="badge-soft">
+              \(x(t) =\) <span class="mathmono" id="xVal">0</span>
+            </span>
+            <span class="badge-soft">
+              \(y(t) =\) <span class="mathmono" id="yVal">0</span>
+            </span>
+            <span class="badge-soft">
+              \(z(t) =\) <span class="mathmono" id="zVal">0</span>
+            </span>
+          </div>
+          <p class="small text-muted mb-0">
+            Mueve el deslizador: el punto que se desplaza sobre las curvas muestra el estado de la población en ese instante.
+          </p>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  const tData = {{ t_vals|tojson }};
+  const xData = {{ x_vals|tojson }};
+  const yData = {{ y_vals|tojson }};
+  const zData = {{ z_vals|tojson }};
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const ctx = document.getElementById('sidaChart').getContext('2d');
+    const tSlider = document.getElementById('tSlider');
+    const tValSpan = document.getElementById('tVal');
+    const xValSpan = document.getElementById('xVal');
+    const yValSpan = document.getElementById('yVal');
+    const zValSpan = document.getElementById('zVal');
+
+    // datasets para los marcadores (un punto en el tiempo seleccionado)
+    const markerX = new Array(tData.length).fill(null);
+    const markerY = new Array(tData.length).fill(null);
+    const markerZ = new Array(tData.length).fill(null);
+
+    const sidaChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: tData,
+        datasets: [
+          {
+            label: 'Susceptibles x(t)',
+            data: xData,
+            borderWidth: 2,
+            pointRadius: 0,
+            tension: 0.15
+          },
+          {
+            label: 'Infectados sin tratamiento y(t)',
+            data: yData,
+            borderWidth: 2,
+            pointRadius: 0,
+            tension: 0.15
+          },
+          {
+            label: 'Infectados con tratamiento z(t)',
+            data: zData,
+            borderWidth: 2,
+            pointRadius: 0,
+            tension: 0.15
+          },
+          {
+            label: 'Punto x(t)',
+            data: markerX,
+            pointRadius: 4,
+            showLine: false
+          },
+          {
+            label: 'Punto y(t)',
+            data: markerY,
+            pointRadius: 4,
+            showLine: false
+          },
+          {
+            label: 'Punto z(t)',
+            data: markerZ,
+            pointRadius: 4,
+            showLine: false
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        animation: false,
+        plugins: {
+          legend: {
+            labels: { font: { size: 11 } }
+          }
+        },
+        scales: {
+          x: {
+            title: { display: true, text: 'Tiempo' },
+            ticks: { maxTicksLimit: 6 }
+          },
+          y: {
+            title: { display: true, text: 'Número de personas' },
+            beginAtZero: true
+          }
+        }
+      }
+    });
+
+    // Configurar rango del slider según los datos
+    if (tData.length > 1) {
+      tSlider.min = 0;
+      tSlider.max = tData.length - 1;
+      tSlider.step = 1;
+      tSlider.value = 0;
+    }
+
+    function updateMarker() {
+      const idx = parseInt(tSlider.value) || 0;
+
+      // limpiar marcadores
+      for (let i = 0; i < tData.length; i++) {
+        markerX[i] = null;
+        markerY[i] = null;
+        markerZ[i] = null;
+      }
+
+      // poner punto en el índice seleccionado
+      markerX[idx] = xData[idx];
+      markerY[idx] = yData[idx];
+      markerZ[idx] = zData[idx];
+
+      // actualizar textos
+      const t = tData[idx] ?? 0;
+      const x = xData[idx] ?? 0;
+      const y = yData[idx] ?? 0;
+      const z = zData[idx] ?? 0;
+
+      tValSpan.textContent = t.toFixed(2);
+      xValSpan.textContent = x.toFixed(2);
+      yValSpan.textContent = y.toFixed(2);
+      zValSpan.textContent = z.toFixed(2);
+
+      sidaChart.update('none');
+    }
+
+    tSlider.addEventListener('input', updateMarker);
+    updateMarker(); // estado inicial
+  });
+</script>
+{% endblock %}
