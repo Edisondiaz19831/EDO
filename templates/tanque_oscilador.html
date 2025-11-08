@@ -67,6 +67,7 @@
 
         <h6 class="mb-1">2. Vaciado (Torricelli)</h6>
         <p class="small mb-1">
+          Para tanque de sección constante:
           \[
             \dot h = -\frac{a}{A}\sqrt{2gh},\quad h\ge 0.
           \]
@@ -74,14 +75,14 @@
 
         <h6 class="mb-1">3. Coordenada del oscilador</h6>
         <p class="small mb-1">
-          Definimos \(x(t)\) como desplazamiento desde la posición de equilibrio instantánea.
-          Entonces, siguiendo el esquema del profe:
+          Definimos \(x(t)\) como desplazamiento respecto a la posición de equilibrio
+          instantánea. Con esa elección:
           \[
             m(t)\ddot x + c\dot x + kx = 0.
           \]
         </p>
 
-        <h6 class="mb-1">4. Sistema acoplado</h6>
+        <h6 class="mb-1">4. Sistema acoplado final</h6>
         <p class="small mb-2">
           \[
           \begin{cases}
@@ -96,7 +97,8 @@
         <div class="alert alert-secondary small mb-0">
           Al inicio \(m\) es grande ⇒ oscilaciones lentas.
           A medida que se vacía el tanque, \(m(t)\) baja,
-          \(\omega(t)=\sqrt{k/m(t)}\) sube y el sistema oscila más rápido.
+          \(\omega(t)=\sqrt{k/m(t)}\) sube y el sistema se vuelve más “ligero”.
+          El vaciado (Torricelli) y el movimiento (oscilador amortiguado) quedan acoplados.
         </div>
       </div>
     </div>
@@ -160,6 +162,9 @@
           <span class="badge-soft">
             ω₀(0) = <span id="omega0Label" class="mathmono"></span> rad/s
           </span>
+          <span class="badge-soft">
+            T_vac ≈ <span id="TvacLabel" class="mathmono">—</span> s
+          </span>
         </div>
 
         <!-- Dibujo -->
@@ -182,7 +187,7 @@
             <!-- Plataforma móvil -->
             <rect id="platform" x="70" y="220" width="100" height="10" fill="#57534e"/>
 
-            <!-- Tanque + agua -->
+            <!-- Tanque + agua (grupo que se mueve) -->
             <g id="tankGroup" transform="translate(80,120)">
               <rect x="0" y="0" width="80" height="100"
                     fill="#f9fafb" stroke="#111827" stroke-width="2"/>
@@ -216,8 +221,8 @@
         </div>
 
         <p class="small text-muted mt-2 mb-0">
-          El deslizador mueve el tiempo en ambas gráficas y en el dibujo:
-          ves vaciarse el tanque y cómo cambian las oscilaciones.
+          El punto rojo marca el instante en que el modelo numérico detecta que el tanque está prácticamente vacío.
+          En la gráfica de \(x(t)\) ves el estado del resorte en ese mismo instante.
         </p>
       </div>
     </div>
@@ -226,13 +231,11 @@
 
 <script>
 // ===== Geometría SVG =====
-const TANK_INITIAL_Y = 120;    // translateY inicial grupo tanque
-const PLATFORM_Y0    = 220;    // y inicial plataforma
-const SPRING_BOTTOM_Y = 240;   // anclaje inferior resorte
-
-// Límites de desplazamiento visual (en píxeles)
-const MAX_COMPRESS = 25;       // máximo que puede bajar (hacia el resorte)
-const MAX_EXTEND   = -40;      // máximo que puede subir
+const TANK_INITIAL_Y = 120;
+const PLATFORM_Y0    = 220;
+const SPRING_BOTTOM_Y = 240;
+const MAX_COMPRESS = 25;
+const MAX_EXTEND   = -40;
 
 document.addEventListener('DOMContentLoaded', () => {
   const AEl = document.getElementById('AInput');
@@ -248,6 +251,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const m0Label = document.getElementById('m0Label');
   const omega0Label = document.getElementById('omega0Label');
+  const TvacLabel = document.getElementById('TvacLabel');
 
   const waterRect = document.getElementById('waterRect');
   const waterTop = document.getElementById('waterTop');
@@ -266,27 +270,30 @@ document.addEventListener('DOMContentLoaded', () => {
   let chartH = null;
   let chartX = null;
   let tData = [], hData = [], xData = [], vData = [];
+  let idxVac = -1;          // índice donde se vacía
+  let T_vac_theory = null;  // tiempo de vaciado teórico
 
   const g = 9.8;
 
-  function bounds(arr, frac=0.15){
-    let min = Math.min(...arr), max = Math.max(...arr);
-    if (!isFinite(min) || !isFinite(max)){ return {min:-0.5, max:0.5}; }
-    if (min === max){ min -= 0.1; max += 0.1; }
-    const span = max-min;
-    return {min: min-frac*span, max:max+frac*span};
-  }
-
-  // ===== derivadas del sistema [x, v, h] =====
+  // ===== Modelo físico =====
   function deriv(state, A, a, rho, M, k, c){
-    const x = state[0], v = state[1], h = Math.max(state[2],0);
-    const m = M + rho*A*h;
-    const dhdt = (h>0 && A>0 && a>=0) ? -(a/A)*Math.sqrt(2*g*h) : 0;
-    const dvdt = (m>0) ? ( - (c/m)*v - (k/m)*x ) : 0;
+    const x = state[0];
+    const v = state[1];
+    const h = Math.max(state[2], 0);
+
+    let m = M + rho*A*h;
+    if (m < 1e-6) m = 1e-6;
+
+    let dhdt = 0;
+    if (h > 0 && A > 0 && a > 0){
+      dhdt = - (a / A) * Math.sqrt(2 * g * h);
+    }
+
+    const dvdt = - (c/m)*v - (k/m)*x;
+
     return [v, dvdt, dhdt];
   }
 
-  // RK4 un paso
   function rk4_step(state, dt, A, a, rho, M, k, c){
     const k1 = deriv(state, A,a,rho,M,k,c);
     const k2 = deriv(state.map((s,i)=>s+0.5*dt*k1[i]), A,a,rho,M,k,c);
@@ -295,62 +302,89 @@ document.addEventListener('DOMContentLoaded', () => {
     return state.map((s,i)=> s + dt*(k1[i]+2*k2[i]+2*k3[i]+k4[i])/6 );
   }
 
-  // ===== simulación =====
+  // ===== Simulación =====
   function simulate(){
-    let A = parseFloat(AEl.value) || {{ A }};
-    let a = parseFloat(aEl.value) || {{ a }};
+    let A   = parseFloat(AEl.value)   || {{ A }};
+    let a   = parseFloat(aEl.value)   || {{ a }};
     let rho = parseFloat(rhoEl.value) || {{ rho }};
-    let M = parseFloat(MEl.value) || {{ M }};
-    let k = parseFloat(kEl.value) || {{ k }};
-    let c = parseFloat(cEl.value) || {{ c }};
-    let h0 = parseFloat(h0El.value) || {{ h0 }};
-    let x0 = parseFloat(x0El.value) || {{ x0 }};
-    let v0 = parseFloat(v0El.value) || {{ v0 }};
+    let M   = parseFloat(MEl.value)   || {{ M }};
+    let k   = parseFloat(kEl.value)   || {{ k }};
+    let c   = parseFloat(cEl.value)   || {{ c }};
+    let h0  = parseFloat(h0El.value)  || {{ h0 }};
+    let x0  = parseFloat(x0El.value)  || {{ x0 }};
+    let v0  = parseFloat(v0El.value)  || {{ v0 }};
     let tmax = parseFloat(tmaxEl.value) || 20;
 
-    if (A<=0) A=0.2;
-    if (a<0) a=0;
-    if (rho<=0) rho=1000;
-    if (M<=0) M=5;
-    if (k<=0) k=50;
-    if (c<0) c=0.5;
-    if (tmax<=0) tmax=10;
+    // saneo básico
+    if (A <= 0)   A = 0.2;
+    if (a < 0)    a = 0;
+    if (rho <= 0) rho = 1000;
+    if (M <= 0)   M = 5;
+    if (k <= 0)   k = 50;
+    if (c < 0)    c = 0.5;
+    if (h0 < 0)   h0 = 0;
+    if (tmax <= 0) tmax = 10;
 
-    // Si x0≈0, ponemos un pequeño desplazamiento para que se vea la oscilación
-    if (Math.abs(x0) < 1e-6) {
+    // excitación mínima si x0=0
+    if (Math.abs(x0) < 1e-6){
       x0 = 0.05;
       x0El.value = x0.toFixed(2);
     }
 
-    const m0 = M + rho*A*Math.max(h0,0);
-    const omega0 = Math.sqrt(k/m0);
+    // tiempo de vaciado teórico
+    if (A > 0 && a > 0 && h0 > 0){
+      T_vac_theory = (A/a) * Math.sqrt(2*h0/g);
+      TvacLabel.textContent = T_vac_theory.toFixed(1);
+      if (tmax < T_vac_theory){
+        tmax = T_vac_theory;
+        tmaxEl.value = T_vac_theory.toFixed(1);
+      }
+    } else {
+      T_vac_theory = null;
+      TvacLabel.textContent = '—';
+    }
 
+    const m0 = M + rho*A*h0;
+    const omega0 = Math.sqrt(k / m0);
     m0Label.textContent = m0.toFixed(3);
     omega0Label.textContent = omega0.toFixed(3);
 
-    const N = 1500;
-    const dt = tmax / N;
+    // integración
+    const dt = 0.01;
+    let N = Math.max(1000, Math.floor(tmax / dt));
+    N = Math.min(N, 40000);
 
     tData = [];
     hData = [];
     xData = [];
     vData = [];
+    idxVac = -1;
 
     let state = [x0, v0, h0];
 
-    for (let i=0; i<=N; i++){
-      const t = i*dt;
+    for (let i = 0; i <= N; i++){
+      const t = i * dt;
       tData.push(t);
-      xData.push(state[0]);
-      vData.push(state[1]);
-      hData.push(Math.max(state[2],0));
+
+      const x = state[0];
+      const v = state[1];
+      const h = Math.max(state[2], 0);
+
+      xData.push(x);
+      vData.push(v);
+      hData.push(h);
+
+      if (idxVac === -1 && h <= 1e-4) {
+        idxVac = i; // primer instante casi vacío
+      }
+
       state = rk4_step(state, dt, A,a,rho,M,k,c);
       if (state[2] < 0) state[2] = 0;
     }
 
     tSlider.min = 0;
-    tSlider.max = tmax.toFixed(2);
-    if (parseFloat(tSlider.value) > tmax) tSlider.value = tmax;
+    tSlider.max = (N*dt).toFixed(2);
+    if (parseFloat(tSlider.value) > N*dt) tSlider.value = (N*dt).toFixed(2);
 
     buildCharts();
     updateFromSlider();
@@ -360,22 +394,41 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // ===== gráficas =====
+  // ===== Gráficas =====
   function buildCharts(){
     const markerH = new Array(tData.length).fill(null);
     const markerX = new Array(tData.length).fill(null);
+    const vacH = new Array(tData.length).fill(null);
+    const vacX = new Array(tData.length).fill(null);
 
-    const bH = bounds(hData);
-    const bX = bounds(xData);
+    // marcador de vaciado
+    if (idxVac >= 0){
+      vacH[idxVac] = hData[idxVac];
+      vacX[idxVac] = xData[idxVac];
+    }
+
+    // límites h(t): 0 a un poco más del máximo
+    const maxH = Math.max(...hData);
+    const yHmin = 0;
+    const yHmax = maxH > 0 ? maxH * 1.1 : 1;
+
+    // límites x(t): simétricos
+    const maxAbsX = Math.max(...xData.map(v => Math.abs(v))) || 0.05;
+    const yXmax = Math.max(maxAbsX * 1.2, 0.05);
+    const yXmin = -yXmax;
+
+    const ctxH = document.getElementById('chartH').getContext('2d');
+    const ctxX = document.getElementById('chartX').getContext('2d');
 
     if (!chartH){
-      chartH = new Chart(document.getElementById('chartH').getContext('2d'), {
+      chartH = new Chart(ctxH, {
         type:'line',
         data:{
           labels:tData,
           datasets:[
             {label:'h(t)', data:hData, pointRadius:0, tension:0.15},
-            {label:'t', data:markerH, pointRadius:4, showLine:false}
+            {label:'t', data:markerH, pointRadius:4, showLine:false},
+            {label:'T_vac', data:vacH, pointRadius:5, pointBackgroundColor:'red', showLine:false}
           ]
         },
         options:{
@@ -384,7 +437,7 @@ document.addEventListener('DOMContentLoaded', () => {
           scales:{
             x:{title:{display:true,text:'t [s]'},ticks:{autoSkip:true,maxTicksLimit:6}},
             y:{title:{display:true,text:'h(t) [m]'},
-               suggestedMin:bH.min, suggestedMax:bH.max}
+               min:yHmin, max:yHmax}
           },
           plugins:{legend:{display:false}}
         }
@@ -393,19 +446,21 @@ document.addEventListener('DOMContentLoaded', () => {
       chartH.data.labels = tData;
       chartH.data.datasets[0].data = hData;
       chartH.data.datasets[1].data = markerH;
-      chartH.options.scales.y.suggestedMin = bH.min;
-      chartH.options.scales.y.suggestedMax = bH.max;
+      chartH.data.datasets[2].data = vacH;
+      chartH.options.scales.y.min = yHmin;
+      chartH.options.scales.y.max = yHmax;
       chartH.update();
     }
 
     if (!chartX){
-      chartX = new Chart(document.getElementById('chartX').getContext('2d'), {
+      chartX = new Chart(ctxX, {
         type:'line',
         data:{
           labels:tData,
           datasets:[
             {label:'x(t)', data:xData, pointRadius:0, tension:0.15},
-            {label:'t', data:markerX, pointRadius:4, showLine:false}
+            {label:'t', data:markerX, pointRadius:4, showLine:false},
+            {label:'T_vac', data:vacX, pointRadius:5, pointBackgroundColor:'red', showLine:false}
           ]
         },
         options:{
@@ -414,7 +469,7 @@ document.addEventListener('DOMContentLoaded', () => {
           scales:{
             x:{title:{display:true,text:'t [s]'},ticks:{autoSkip:true,maxTicksLimit:6}},
             y:{title:{display:true,text:'x(t) [m]'},
-               suggestedMin:bX.min, suggestedMax:bX.max}
+               min:yXmin, max:yXmax}
           },
           plugins:{legend:{display:false}}
         }
@@ -423,20 +478,21 @@ document.addEventListener('DOMContentLoaded', () => {
       chartX.data.labels = tData;
       chartX.data.datasets[0].data = xData;
       chartX.data.datasets[1].data = markerX;
-      chartX.options.scales.y.suggestedMin = bX.min;
-      chartX.options.scales.y.suggestedMax = bX.max;
+      chartX.data.datasets[2].data = vacX;
+      chartX.options.scales.y.min = yXmin;
+      chartX.options.scales.y.max = yXmax;
       chartX.update();
     }
   }
 
-  // ===== actualizar dibujo + marcadores =====
+  // ===== Dibujo + marcadores según slider =====
   function updateFromSlider(){
     if (!tData.length) return;
 
     const tSel = parseFloat(tSlider.value) || 0;
     const tMax = tData[tData.length-1];
-    const frac = Math.max(0, Math.min(1, tSel/tMax));
-    const idx = Math.round(frac*(tData.length-1));
+    const frac = Math.max(0, Math.min(1, tSel / tMax));
+    const idx = Math.round(frac * (tData.length - 1));
 
     const hSel = hData[idx];
     const xSel = xData[idx];
@@ -456,10 +512,9 @@ document.addEventListener('DOMContentLoaded', () => {
     waterRect.setAttribute('height', waterHeight);
     waterTop.setAttribute('y', waterY);
 
-    // Movimiento vertical del tanque/platforma
+    // Movimiento tanque + plataforma (x hacia abajo positivo visualmente)
     const scale = 80; // m -> px
     let disp = xSel * scale;
-
     if (disp > MAX_COMPRESS) disp = MAX_COMPRESS;
     if (disp < MAX_EXTEND)   disp = MAX_EXTEND;
 
@@ -472,6 +527,7 @@ document.addEventListener('DOMContentLoaded', () => {
     updateSpring(platformY);
     updateDamper(platformY);
 
+    // Marcadores en gráficas
     if (chartH && chartX){
       const mH = chartH.data.datasets[1].data;
       const mX = chartX.data.datasets[1].data;
@@ -487,11 +543,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const bottomY = SPRING_BOTTOM_Y;
     let height = bottomY - topY;
     if (height < 8) height = 8;
-
     const segments = 8;
     const amplitude = 8;
     let path = `M110,${bottomY} `;
-
     for (let i = 1; i <= segments; i++) {
       const y = bottomY - (height * i / segments);
       const x = 110 + (i % 2 === 0 ? amplitude : -amplitude);
@@ -502,10 +556,9 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function updateDamper(platformY) {
-    const baseY = 230; // parte fija
+    const baseY = 230;
     damperCylinder.setAttribute('y', baseY);
     damperCylinder.setAttribute('height', 20);
-
     const pistonBottom = baseY;
     const pistonTop = Math.min(platformY - 10, pistonBottom);
     const h = Math.max(5, pistonBottom - pistonTop);
@@ -513,13 +566,14 @@ document.addEventListener('DOMContentLoaded', () => {
     damperPiston.setAttribute('height', h);
   }
 
+  // Eventos
   [AEl,aEl,rhoEl,MEl,kEl,cEl,h0El,x0El,v0El,tmaxEl].forEach(el => {
     el.addEventListener('input', simulate);
     el.addEventListener('change', simulate);
   });
-
   tSlider.addEventListener('input', updateFromSlider);
 
+  // init
   simulate();
 });
 </script>
